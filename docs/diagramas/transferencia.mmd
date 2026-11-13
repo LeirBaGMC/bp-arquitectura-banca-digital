@@ -1,0 +1,31 @@
+sequenceDiagram
+    autonumber
+    actor U as Usuario
+    participant C as SPA o app móvil
+    participant API as API Gateway
+    participant T as Servicio de transferencias
+    participant CORE as Core
+    participant DB as PostgreSQL
+    participant BUS as EventBridge
+    participant Q as SQS
+    participant W as Worker
+    participant NET as Red de pagos
+    U->>C: Confirma transferencia
+    C->>API: POST + Idempotency-Key
+    API->>T: Solicitud autenticada
+    T->>CORE: Validar operación y límites
+    CORE-->>T: Resultado
+    T->>DB: PENDING + idempotencia + outbox
+    T-->>C: 202 Accepted + identificador
+    DB->>BUS: Outbox relay publica TransferRequested
+    BUS->>Q: Enrutar ejecución
+    Q->>W: Entregar mensaje
+    W->>NET: Ejecutar pago
+    alt Pago confirmado
+        NET-->>W: Confirmación
+        W->>DB: COMPLETED
+        W->>BUS: TransferCompleted
+    else Sin respuesta concluyente
+        W->>DB: PENDING_RECONCILIATION
+        Note over W,NET: Consultar estado antes de reintentar
+    end

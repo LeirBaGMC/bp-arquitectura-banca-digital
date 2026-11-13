@@ -1,0 +1,30 @@
+sequenceDiagram
+    autonumber
+    actor U as Usuario
+    participant APP as App móvil
+    participant API as API Gateway
+    participant ON as Servicio onboarding
+    participant BIO as Proveedor facial
+    participant CORE as Core
+    participant IDP as IdP
+    participant AUD as Auditoría
+    U->>APP: Inicia registro
+    APP->>API: Solicitar proceso e idempotency key
+    API->>ON: Crear proceso
+    ON->>BIO: Solicitar sesión de verificación
+    BIO-->>APP: Flujo seguro de captura
+    U->>APP: Completa verificación
+    APP->>BIO: Participa en flujo del proveedor
+    BIO-->>ON: Callback firmado con resultado
+    ON->>AUD: Registrar resultado
+    alt Aprobado
+        ON->>CORE: Crear o vincular cliente
+        CORE-->>ON: Identificador de cliente
+        ON->>IDP: Crear o activar identidad
+        IDP-->>ON: Identidad habilitada
+        ON->>AUD: Registrar activación
+        ON-->>APP: Configurar autenticador y terminar alta
+    else Revisión o rechazo
+        ON-->>APP: Informar estado y próximos pasos
+        ON->>AUD: Registrar revisión o rechazo
+    end

@@ -1,0 +1,29 @@
+flowchart LR
+    USER[Clientes]
+    subgraph PRIMARY[Región primaria]
+        API[API Gateway]
+        LINK[VPC Link + balanceador]
+        subgraph AZ1[AZ A]
+            ECS1[ECS Fargate]
+            DB1[RDS primario]
+        end
+        subgraph AZ2[AZ B]
+            ECS2[ECS Fargate]
+            DB2[RDS standby]
+        end
+        BACKUP[AWS Backup]
+    end
+    subgraph DR[Región DR por definir]
+        COPIES[Copias RDS y S3]
+        INFRA[IaC e imágenes]
+        PILOT[Pilot light para activar]
+    end
+    USER --> API --> LINK
+    LINK --> ECS1
+    LINK --> ECS2
+    ECS1 --> DB1
+    ECS2 --> DB1
+    DB1 -->|replicación síncrona| DB2
+    DB1 --> BACKUP --> COPIES
+    INFRA --> PILOT
+    COPIES --> PILOT

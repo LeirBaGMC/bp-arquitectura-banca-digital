@@ -1,0 +1,18 @@
+flowchart LR
+    PERSONA[Cliente bancario]
+    BP[Canales BP: SPA + app móvil]
+    CORE[Core: datos básicos, productos, movimientos]
+    DETALLE[Sistema de información detallada]
+    IDP[Proveedor de identidad OAuth 2.0 / OIDC]
+    FACIAL[Proveedor de verificación facial]
+    PAGO[Red de pagos interbancarios]
+    EMAIL[Proveedor de correo]
+    OTRO[Push o SMS]
+    PERSONA -->|consulta, inicia sesión, transfiere| BP
+    BP --> IDP
+    BP --> FACIAL
+    BP --> CORE
+    BP --> DETALLE
+    BP --> PAGO
+    BP --> EMAIL
+    BP --> OTRO
