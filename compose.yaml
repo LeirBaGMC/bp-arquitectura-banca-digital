@@ -1,0 +1,110 @@
+name: bp-arquitectura-banca-digital
+
+# This stack enables the fixed local demo identity and SQLite. Keep host ports on
+# loopback unless testing from a trusted physical device on your LAN.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: "5080"
+      Authentication__EnableLocalDevelopmentIdentity: "true"
+      Banking__DatabasePath: /var/lib/bp-banking/bp-demo.db
+      Cors__AllowedOrigins__0: http://localhost:5173
+      Cors__AllowedOrigins__1: http://127.0.0.1:5173
+      Cors__AllowedOrigins__2: http://localhost:8081
+      Cors__AllowedOrigins__3: http://127.0.0.1:8081
+      Cors__AllowedOrigins__4: "${EXPO_WEB_ORIGIN:-http://localhost:8081}"
+    expose:
+      - "5080"
+    volumes:
+      - banking_data:/var/lib/bp-banking
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    init: true
+    restart: unless-stopped
+    logging: *default-logging
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      - api
+    environment:
+      VITE_API_PROXY_TARGET: http://api:5080
+      VITE_CACHE_DIR: /tmp/vite-cache
+    ports:
+      - "${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-5173}:5173"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:5173/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging: *default-logging
+
+  mobile:
+    profiles:
+      - mobile
+    build:
+      context: .
+      dockerfile: mobile/Dockerfile
+    depends_on:
+      - api
+    environment:
+      EXPO_PUBLIC_API_URL: "${EXPO_PUBLIC_API_URL:-http://10.0.2.2:5173}"
+      EXPO_PUBLIC_LOCAL_AUTH: "${EXPO_PUBLIC_LOCAL_AUTH:-true}"
+      EXPO_PUBLIC_COGNITO_DOMAIN: "${EXPO_PUBLIC_COGNITO_DOMAIN:-}"
+      EXPO_PUBLIC_COGNITO_CLIENT_ID: "${EXPO_PUBLIC_COGNITO_CLIENT_ID:-}"
+      EXPO_PUBLIC_COGNITO_SCOPE: "${EXPO_PUBLIC_COGNITO_SCOPE:-bp/banking-api}"
+      EXPO_PACKAGER_PROXY_URL: "${EXPO_PACKAGER_PROXY_URL:-http://10.0.2.2:8081}"
+      EXPO_NO_TELEMETRY: "1"
+      NPM_CONFIG_CACHE: /tmp/npm-cache
+    ports:
+      - "${EXPO_BIND_ADDRESS:-127.0.0.1}:${EXPO_PORT:-8081}:8081"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 1g
+    cpus: 2.0
+    init: true
+    restart: unless-stopped
+    logging: *default-logging
+
+volumes:
+  banking_data:

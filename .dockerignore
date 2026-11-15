@@ -1,0 +1,37 @@
+# VCS, editor files and local build output
+.git
+.github
+.vs
+**/.vs
+**/bin
+**/obj
+**/node_modules
+**/.expo
+**/dist
+**/web-build
+**/*.log
+
+# Never send local environment files or databases into the build context
+**/.env
+**/.env.*
+!**/.env.example
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/secrets/**
+
+# Reports and other local-only directories
+/docs
+/infra
+/mvp
+/output
+/tmp
+/.nuget
+/Data
+/backend/wwwroot
+/backend/run
+/backend/Data
