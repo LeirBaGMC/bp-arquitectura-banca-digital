@@ -1,6 +1,6 @@
 # Estimación de costos AWS — pendiente
 
-El usuario decidió dejar pendiente el gráfico de costos hasta completar el diseño. No se ha generado un presupuesto final ni se ha completado una estimación en AWS Pricing Calculator.
+El diseño base ya está documentado. A solicitud del usuario, la estimación se completará conjuntamente en AWS Pricing Calculator; este documento no contiene cotización ni subtotal inventado.
 
 ## Supuestos provisionales para completar después
 

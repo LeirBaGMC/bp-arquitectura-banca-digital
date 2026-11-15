@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_Notifications" targetNamespace="https://bp.digital/bpmn">
+  <bpmn:process id="Process_Notifications" name="Entrega desacoplada de notificaciones" isExecutable="false">
+    <bpmn:startEvent id="Start" name="Operacion confirmada"><bpmn:outgoing>Flow_Start_Outbox</bpmn:outgoing></bpmn:startEvent>
+    <bpmn:serviceTask id="Outbox" name="Guardar evento outbox"><bpmn:incoming>Flow_Start_Outbox</bpmn:incoming><bpmn:outgoing>Flow_Outbox_Queue</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="Queue" name="Publicar en SQS"><bpmn:incoming>Flow_Outbox_Queue</bpmn:incoming><bpmn:outgoing>Flow_Queue_Split</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:parallelGateway id="Split" name="Canales independientes" gatewayDirection="Diverging"><bpmn:incoming>Flow_Queue_Split</bpmn:incoming><bpmn:outgoing>Flow_Push</bpmn:outgoing><bpmn:outgoing>Flow_Email</bpmn:outgoing><bpmn:outgoing>Flow_InApp</bpmn:outgoing></bpmn:parallelGateway>
+    <bpmn:serviceTask id="Push" name="Enviar push con SNS"><bpmn:incoming>Flow_Push</bpmn:incoming><bpmn:outgoing>Flow_Push_Join</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="Email" name="Enviar correo con SES"><bpmn:incoming>Flow_Email</bpmn:incoming><bpmn:outgoing>Flow_Email_Join</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="Inbox" name="Guardar en centro de avisos"><bpmn:incoming>Flow_InApp</bpmn:incoming><bpmn:outgoing>Flow_InApp_Join</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:parallelGateway id="Join" name="Canales procesados" gatewayDirection="Converging"><bpmn:incoming>Flow_Push_Join</bpmn:incoming><bpmn:incoming>Flow_Email_Join</bpmn:incoming><bpmn:incoming>Flow_InApp_Join</bpmn:incoming><bpmn:outgoing>Flow_Join_Result</bpmn:outgoing></bpmn:parallelGateway>
+    <bpmn:exclusiveGateway id="DeliveryResult" name="Entrega confirmada?" gatewayDirection="Unspecified"><bpmn:incoming>Flow_Join_Result</bpmn:incoming><bpmn:outgoing>Flow_Delivered</bpmn:outgoing><bpmn:outgoing>Flow_Retry</bpmn:outgoing></bpmn:exclusiveGateway>
+    <bpmn:endEvent id="Delivered" name="Resultado registrado"><bpmn:incoming>Flow_Delivered</bpmn:incoming></bpmn:endEvent>
+    <bpmn:intermediateCatchEvent id="Backoff" name="Esperar con backoff"><bpmn:incoming>Flow_Retry</bpmn:incoming><bpmn:outgoing>Flow_Backoff_Attempt</bpmn:outgoing><bpmn:timerEventDefinition id="Timer_Backoff"/></bpmn:intermediateCatchEvent>
+    <bpmn:exclusiveGateway id="AttemptLimit" name="Quedan reintentos?"><bpmn:incoming>Flow_Backoff_Attempt</bpmn:incoming><bpmn:outgoing>Flow_Requeue</bpmn:outgoing><bpmn:outgoing>Flow_DeadLetter</bpmn:outgoing></bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Requeue" name="Reintentar entrega"><bpmn:incoming>Flow_Requeue</bpmn:incoming><bpmn:outgoing>Flow_Requeue_Queue</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:endEvent id="DeadLetter" name="Enviar a DLQ y alertar"><bpmn:incoming>Flow_DeadLetter</bpmn:incoming></bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_Start_Outbox" sourceRef="Start" targetRef="Outbox"/>
+    <bpmn:sequenceFlow id="Flow_Outbox_Queue" sourceRef="Outbox" targetRef="Queue"/>
+    <bpmn:sequenceFlow id="Flow_Queue_Split" sourceRef="Queue" targetRef="Split"/>
+    <bpmn:sequenceFlow id="Flow_Push" sourceRef="Split" targetRef="Push"/>
+    <bpmn:sequenceFlow id="Flow_Email" sourceRef="Split" targetRef="Email"/>
+    <bpmn:sequenceFlow id="Flow_InApp" sourceRef="Split" targetRef="Inbox"/>
+    <bpmn:sequenceFlow id="Flow_Push_Join" sourceRef="Push" targetRef="Join"/>
+    <bpmn:sequenceFlow id="Flow_Email_Join" sourceRef="Email" targetRef="Join"/>
+    <bpmn:sequenceFlow id="Flow_InApp_Join" sourceRef="Inbox" targetRef="Join"/>
+    <bpmn:sequenceFlow id="Flow_Join_Result" sourceRef="Join" targetRef="DeliveryResult"/>
+    <bpmn:sequenceFlow id="Flow_Delivered" name="Si" sourceRef="DeliveryResult" targetRef="Delivered"/>
+    <bpmn:sequenceFlow id="Flow_Retry" name="No" sourceRef="DeliveryResult" targetRef="Backoff"/>
+    <bpmn:sequenceFlow id="Flow_Backoff_Attempt" sourceRef="Backoff" targetRef="AttemptLimit"/>
+    <bpmn:sequenceFlow id="Flow_Requeue" name="Si" sourceRef="AttemptLimit" targetRef="Requeue"/>
+    <bpmn:sequenceFlow id="Flow_DeadLetter" name="No" sourceRef="AttemptLimit" targetRef="DeadLetter"/>
+    <bpmn:sequenceFlow id="Flow_Requeue_Queue" sourceRef="Requeue" targetRef="Queue"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_Notifications"><bpmndi:BPMNPlane id="Plane_Notifications" bpmnElement="Process_Notifications">
+    <bpmndi:BPMNShape id="Shape_Start" bpmnElement="Start"><dc:Bounds x="30" y="200" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_Outbox" bpmnElement="Outbox"><dc:Bounds x="90" y="178" width="145" height="80"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_Queue" bpmnElement="Queue"><dc:Bounds x="270" y="178" width="140" height="80"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_Split" bpmnElement="Split" isMarkerVisible="true"><dc:Bounds x="450" y="193" width="50" height="50"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_Push" bpmnElement="Push"><dc:Bounds x="560" y="70" width="155" height="80"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_Email" bpmnElement="Email"><dc:Bounds x="560" y="178" width="155" height="80"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_Inbox" bpmnElement="Inbox"><dc:Bounds x="560" y="286" width="155" height="80"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_Join" bpmnElement="Join" isMarkerVisible="true"><dc:Bounds x="770" y="193" width="50" height="50"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_DeliveryResult" bpmnElement="DeliveryResult" isMarkerVisible="true"><dc:Bounds x="870" y="193" width="50" height="50"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_Delivered" bpmnElement="Delivered"><dc:Bounds x="1000" y="90" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_Backoff" bpmnElement="Backoff"><dc:Bounds x="970" y="195" width="50" height="50"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_AttemptLimit" bpmnElement="AttemptLimit" isMarkerVisible="true"><dc:Bounds x="1070" y="195" width="50" height="50"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_Requeue" bpmnElement="Requeue"><dc:Bounds x="1180" y="178" width="145" height="80"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_DeadLetter" bpmnElement="DeadLetter"><dc:Bounds x="1180" y="310" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNEdge id="Edge_Flow_Start_Outbox" bpmnElement="Flow_Start_Outbox"><di:waypoint x="66" y="218"/><di:waypoint x="90" y="218"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Outbox_Queue" bpmnElement="Flow_Outbox_Queue"><di:waypoint x="235" y="218"/><di:waypoint x="270" y="218"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Queue_Split" bpmnElement="Flow_Queue_Split"><di:waypoint x="410" y="218"/><di:waypoint x="450" y="218"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Push" bpmnElement="Flow_Push"><di:waypoint x="475" y="193"/><di:waypoint x="475" y="110"/><di:waypoint x="560" y="110"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Email" bpmnElement="Flow_Email"><di:waypoint x="500" y="218"/><di:waypoint x="560" y="218"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_InApp" bpmnElement="Flow_InApp"><di:waypoint x="475" y="243"/><di:waypoint x="475" y="326"/><di:waypoint x="560" y="326"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Push_Join" bpmnElement="Flow_Push_Join"><di:waypoint x="715" y="110"/><di:waypoint x="795" y="110"/><di:waypoint x="795" y="193"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Email_Join" bpmnElement="Flow_Email_Join"><di:waypoint x="715" y="218"/><di:waypoint x="770" y="218"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_InApp_Join" bpmnElement="Flow_InApp_Join"><di:waypoint x="715" y="326"/><di:waypoint x="795" y="326"/><di:waypoint x="795" y="243"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Join_Result" bpmnElement="Flow_Join_Result"><di:waypoint x="820" y="218"/><di:waypoint x="870" y="218"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Delivered" bpmnElement="Flow_Delivered"><di:waypoint x="895" y="193"/><di:waypoint x="895" y="108"/><di:waypoint x="1000" y="108"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Retry" bpmnElement="Flow_Retry"><di:waypoint x="920" y="218"/><di:waypoint x="970" y="220"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Backoff_Attempt" bpmnElement="Flow_Backoff_Attempt"><di:waypoint x="1020" y="220"/><di:waypoint x="1070" y="220"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Requeue" bpmnElement="Flow_Requeue"><di:waypoint x="1120" y="220"/><di:waypoint x="1180" y="218"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_DeadLetter" bpmnElement="Flow_DeadLetter"><di:waypoint x="1095" y="245"/><di:waypoint x="1095" y="328"/><di:waypoint x="1180" y="328"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Requeue_Queue" bpmnElement="Flow_Requeue_Queue"><di:waypoint x="1252" y="178"/><di:waypoint x="1252" y="35"/><di:waypoint x="340" y="35"/><di:waypoint x="340" y="178"/></bpmndi:BPMNEdge>
+  </bpmndi:BPMNPlane></bpmndi:BPMNDiagram>
+</bpmn:definitions>

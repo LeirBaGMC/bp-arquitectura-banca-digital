@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_FacialOnboarding" targetNamespace="https://bp.digital/bpmn">
+  <bpmn:process id="Process_FacialOnboarding" name="Alta movil con verificacion facial" isExecutable="false">
+    <bpmn:startEvent id="Start" name="Inicio del alta"><bpmn:outgoing>Flow_Start_Consent</bpmn:outgoing></bpmn:startEvent>
+    <bpmn:userTask id="Consent" name="Informar uso y obtener consentimiento"><bpmn:incoming>Flow_Start_Consent</bpmn:incoming><bpmn:outgoing>Flow_Consent_Gateway</bpmn:outgoing></bpmn:userTask>
+    <bpmn:exclusiveGateway id="ConsentDecision" name="Consiente el tratamiento?"><bpmn:incoming>Flow_Consent_Gateway</bpmn:incoming><bpmn:outgoing>Flow_NoConsent</bpmn:outgoing><bpmn:outgoing>Flow_Consent_Session</bpmn:outgoing></bpmn:exclusiveGateway>
+    <bpmn:endEvent id="Cancelled" name="Alta detenida"><bpmn:incoming>Flow_NoConsent</bpmn:incoming></bpmn:endEvent>
+    <bpmn:serviceTask id="CreateSession" name="API crea sesion temporal"><bpmn:incoming>Flow_Consent_Session</bpmn:incoming><bpmn:outgoing>Flow_Session_Liveness</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="Liveness" name="SDK nativo verifica presencia"><bpmn:incoming>Flow_Session_Liveness</bpmn:incoming><bpmn:outgoing>Flow_Liveness_Compare</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="Compare" name="Cotejar selfie con documento"><bpmn:incoming>Flow_Liveness_Compare</bpmn:incoming><bpmn:outgoing>Flow_Compare_Result</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="MatchDecision" name="Resultado suficiente?"><bpmn:incoming>Flow_Compare_Result</bpmn:incoming><bpmn:outgoing>Flow_Approve</bpmn:outgoing><bpmn:outgoing>Flow_Review</bpmn:outgoing><bpmn:outgoing>Flow_Reject</bpmn:outgoing></bpmn:exclusiveGateway>
+    <bpmn:endEvent id="Approved" name="Identidad verificada"><bpmn:incoming>Flow_Approve</bpmn:incoming></bpmn:endEvent>
+    <bpmn:userTask id="ManualReview" name="Revisar caso y ruta alternativa"><bpmn:incoming>Flow_Review</bpmn:incoming><bpmn:outgoing>Flow_Review_End</bpmn:outgoing></bpmn:userTask>
+    <bpmn:endEvent id="PendingReview" name="Revision pendiente"><bpmn:incoming>Flow_Review_End</bpmn:incoming></bpmn:endEvent>
+    <bpmn:endEvent id="Rejected" name="No verificado"><bpmn:incoming>Flow_Reject</bpmn:incoming></bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_Start_Consent" sourceRef="Start" targetRef="Consent"/>
+    <bpmn:sequenceFlow id="Flow_Consent_Gateway" sourceRef="Consent" targetRef="ConsentDecision"/>
+    <bpmn:sequenceFlow id="Flow_NoConsent" name="No" sourceRef="ConsentDecision" targetRef="Cancelled"/>
+    <bpmn:sequenceFlow id="Flow_Consent_Session" name="Si" sourceRef="ConsentDecision" targetRef="CreateSession"/>
+    <bpmn:sequenceFlow id="Flow_Session_Liveness" sourceRef="CreateSession" targetRef="Liveness"/>
+    <bpmn:sequenceFlow id="Flow_Liveness_Compare" sourceRef="Liveness" targetRef="Compare"/>
+    <bpmn:sequenceFlow id="Flow_Compare_Result" sourceRef="Compare" targetRef="MatchDecision"/>
+    <bpmn:sequenceFlow id="Flow_Approve" name="Aprobado" sourceRef="MatchDecision" targetRef="Approved"/>
+    <bpmn:sequenceFlow id="Flow_Review" name="Incierto" sourceRef="MatchDecision" targetRef="ManualReview"/>
+    <bpmn:sequenceFlow id="Flow_Reject" name="No coincide" sourceRef="MatchDecision" targetRef="Rejected"/>
+    <bpmn:sequenceFlow id="Flow_Review_End" sourceRef="ManualReview" targetRef="PendingReview"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_FacialOnboarding"><bpmndi:BPMNPlane id="Plane_FacialOnboarding" bpmnElement="Process_FacialOnboarding">
+    <bpmndi:BPMNShape id="Shape_Start" bpmnElement="Start"><dc:Bounds x="30" y="150" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_Consent" bpmnElement="Consent"><dc:Bounds x="100" y="128" width="150" height="80"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_ConsentDecision" bpmnElement="ConsentDecision" isMarkerVisible="true"><dc:Bounds x="285" y="143" width="50" height="50"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_Cancelled" bpmnElement="Cancelled"><dc:Bounds x="350" y="250" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_CreateSession" bpmnElement="CreateSession"><dc:Bounds x="390" y="128" width="150" height="80"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_Liveness" bpmnElement="Liveness"><dc:Bounds x="575" y="128" width="150" height="80"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_Compare" bpmnElement="Compare"><dc:Bounds x="760" y="128" width="160" height="80"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_MatchDecision" bpmnElement="MatchDecision" isMarkerVisible="true"><dc:Bounds x="955" y="143" width="50" height="50"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_Approved" bpmnElement="Approved"><dc:Bounds x="1060" y="45" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_ManualReview" bpmnElement="ManualReview"><dc:Bounds x="1060" y="128" width="170" height="80"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_PendingReview" bpmnElement="PendingReview"><dc:Bounds x="1260" y="150" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Shape_Rejected" bpmnElement="Rejected"><dc:Bounds x="1060" y="260" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNEdge id="Edge_Flow_Start_Consent" bpmnElement="Flow_Start_Consent"><di:waypoint x="66" y="168"/><di:waypoint x="100" y="168"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Consent_Gateway" bpmnElement="Flow_Consent_Gateway"><di:waypoint x="250" y="168"/><di:waypoint x="285" y="168"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_NoConsent" bpmnElement="Flow_NoConsent"><di:waypoint x="310" y="193"/><di:waypoint x="310" y="268"/><di:waypoint x="350" y="268"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Consent_Session" bpmnElement="Flow_Consent_Session"><di:waypoint x="335" y="168"/><di:waypoint x="390" y="168"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Session_Liveness" bpmnElement="Flow_Session_Liveness"><di:waypoint x="540" y="168"/><di:waypoint x="575" y="168"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Liveness_Compare" bpmnElement="Flow_Liveness_Compare"><di:waypoint x="725" y="168"/><di:waypoint x="760" y="168"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Compare_Result" bpmnElement="Flow_Compare_Result"><di:waypoint x="920" y="168"/><di:waypoint x="955" y="168"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Approve" bpmnElement="Flow_Approve"><di:waypoint x="980" y="143"/><di:waypoint x="980" y="63"/><di:waypoint x="1060" y="63"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Review" bpmnElement="Flow_Review"><di:waypoint x="1005" y="168"/><di:waypoint x="1060" y="168"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Reject" bpmnElement="Flow_Reject"><di:waypoint x="980" y="193"/><di:waypoint x="980" y="278"/><di:waypoint x="1060" y="278"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Edge_Flow_Review_End" bpmnElement="Flow_Review_End"><di:waypoint x="1230" y="168"/><di:waypoint x="1260" y="168"/></bpmndi:BPMNEdge>
+  </bpmndi:BPMNPlane></bpmndi:BPMNDiagram>
+</bpmn:definitions>

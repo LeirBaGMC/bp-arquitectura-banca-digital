@@ -1,0 +1,15 @@
+.git
+.vs
+.env
+.env.*
+**/node_modules
+**/bin
+**/obj
+**/dist
+**/Data/*.db
+**/Data/*.db-shm
+**/Data/*.db-wal
+api/run
+api/wwwroot
+output
+tmp

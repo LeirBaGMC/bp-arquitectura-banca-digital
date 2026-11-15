@@ -19,9 +19,15 @@ flowchart LR
     ONBOARD --> IDP[IdP]
     DB --> RELAY[Relay outbox]
     RELAY --> BUS[EventBridge]
-    BUS --> Q[SQS + DLQ]
-    Q --> AUDIT[Servicio de auditoría]
-    Q --> NOTIFY[Servicio de notificaciones]
+    BUS --> QPAY[SQS ejecución + DLQ]
+    BUS --> QA[SQS auditoría + DLQ]
+    BUS --> QN[SQS notificaciones + DLQ]
+    QPAY --> WORKER[Worker de transferencias]
+    WORKER --> CORE
+    WORKER --> PAYMENT
+    WORKER --> DB
+    QA --> AUDIT[Servicio de auditoría]
+    QN --> NOTIFY[Servicio de notificaciones]
     AUDIT --> AUDITDB[(DynamoDB auditoría)]
     AUDITDB --> ARCHIVE[S3 Object Lock]
     NOTIFY --> EMAIL[Correo]

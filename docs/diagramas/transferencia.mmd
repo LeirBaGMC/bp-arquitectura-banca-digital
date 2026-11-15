@@ -6,10 +6,15 @@ sequenceDiagram
     participant T as Servicio de transferencias
     participant CORE as Core
     participant DB as PostgreSQL
+    participant RELAY as Relay outbox
     participant BUS as EventBridge
     participant Q as SQS
     participant W as Worker
     participant NET as Red de pagos
+    participant QA as SQS auditoría
+    participant AUD as Consumidor de auditoría
+    participant QN as SQS notificaciones
+    participant N as Consumidor de notificaciones
     U->>C: Confirma transferencia
     C->>API: POST + Idempotency-Key
     API->>T: Solicitud autenticada
@@ -17,7 +22,8 @@ sequenceDiagram
     CORE-->>T: Resultado
     T->>DB: PENDING + idempotencia + outbox
     T-->>C: 202 Accepted + identificador
-    DB->>BUS: Outbox relay publica TransferRequested
+    DB->>RELAY: Outbox pendiente
+    RELAY->>BUS: Publicar TransferRequested
     BUS->>Q: Enrutar ejecución
     Q->>W: Entregar mensaje
     W->>NET: Ejecutar pago
@@ -25,6 +31,18 @@ sequenceDiagram
         NET-->>W: Confirmación
         W->>DB: COMPLETED
         W->>BUS: TransferCompleted
+        BUS->>QA: Enrutar evento de auditoría
+        QA->>AUD: Entregar evento
+        BUS->>QN: Enrutar notificación
+        QN->>N: Entregar solicitud
+    else Rechazado definitivamente
+        NET-->>W: Rechazo
+        W->>DB: REJECTED
+        W->>BUS: TransferRejected
+        BUS->>QA: Enrutar evento de auditoría
+        QA->>AUD: Entregar evento
+        BUS->>QN: Enrutar notificación
+        QN->>N: Entregar solicitud
     else Sin respuesta concluyente
         W->>DB: PENDING_RECONCILIATION
         Note over W,NET: Consultar estado antes de reintentar

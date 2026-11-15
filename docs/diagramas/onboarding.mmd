@@ -23,7 +23,13 @@ sequenceDiagram
         ON->>IDP: Crear o activar identidad
         IDP-->>ON: Identidad habilitada
         ON->>AUD: Registrar activación
-        ON-->>APP: Configurar autenticador y terminar alta
+        ON-->>APP: Solicitar registro de credencial o passkey
+        APP->>IDP: Registrar credencial inicial y factor MFA
+        IDP-->>APP: Credencial activada
+        APP->>IDP: Iniciar sesión con la credencial recién registrada
+        IDP-->>APP: Sesión autenticada
+        APP-->>U: Alta terminada y acceso habilitado
+        Note over APP,IDP: Biometría local desbloquea credencial del dispositivo; el proveedor facial solo verifica identidad en onboarding
     else Revisión o rechazo
         ON-->>APP: Informar estado y próximos pasos
         ON->>AUD: Registrar revisión o rechazo

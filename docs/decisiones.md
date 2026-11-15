@@ -104,3 +104,25 @@ Este registro separa decisiones propuestas de requisitos del ejercicio. Las deci
 **Alternativas:** Lambda y un modelo más serverless, o Kubernetes administrado, también son posibles; se prefieren contenedores ECS para mantener control claro del runtime y evitar operar un clúster Kubernetes para este MVP.
 
 **Nota:** una región secundaria es necesaria para afrontar una caída regional; los objetivos RTO/RPO y su costo están pendientes.
+
+## D-10 - Proyección de lectura con CQRS
+
+**Decisión propuesta:** mantener las escrituras y estados financieros en sus fuentes maestras; publicar una proyección de lectura en DynamoDB para consultas repetidas de datos de cliente. El servicio de consulta aplica Cache-Aside con TTL acotado solo a datos cuya frescura tolera el negocio.
+
+**Justificación:**
+
+1. CQRS separa el modelo de consulta del modelo transaccional y reduce carga de lectura sobre Core y detalle.
+2. La proyección puede escalar según el patrón de consulta; versión y fecha permiten medir frescura y detectar retrasos.
+
+**Control:** la proyección no autoriza operaciones ni es fuente de verdad. Para transferencias, validar titularidad, saldo y límites contra sistemas autoritativos.
+
+## D-11 - Auditoría asíncrona, separada e inmutable
+
+**Decisión propuesta:** emitir eventos de auditoría a una cola SQS dedicada, almacenarlos en un repositorio separado y archivar los registros sujetos a retención en S3 Object Lock.
+
+**Justificación:**
+
+1. Una cola independiente evita que auditoría y notificaciones compitan por el mismo mensaje y permite reintentos/DLQ por consumidor.
+2. Separar permisos y almacenamiento reduce el riesgo de que una cuenta operativa modifique sus propios registros; el archivo protegido apoya integridad y revisión.
+
+**Control:** cada evento lleva correlación, actor, acción, recurso, instante, resultado y origen; evitar secretos y payloads personales innecesarios. Retención, bloqueo y acceso deben ajustarse a política y regulación aplicables.

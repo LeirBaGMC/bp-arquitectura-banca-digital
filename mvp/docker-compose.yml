@@ -1,0 +1,42 @@
+services:
+  banking-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_COGNITO_AUTHORITY: ${VITE_COGNITO_AUTHORITY:-}
+        VITE_COGNITO_DOMAIN: ${VITE_COGNITO_DOMAIN:-}
+        VITE_COGNITO_CLIENT_ID: ${VITE_COGNITO_CLIENT_ID:-}
+        VITE_COGNITO_REDIRECT_URI: ${VITE_COGNITO_REDIRECT_URI:-}
+        VITE_COGNITO_SCOPE: ${VITE_COGNITO_SCOPE:-bp/banking-api}
+        VITE_LOCAL_AUTH: "true"
+    image: bp-banking-demo:local
+    init: true
+    ports:
+      - "127.0.0.1:${APP_PORT:-5080}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development # Local-only: selects the fixed development identity.
+      ASPNETCORE_HTTP_PORTS: "8080"
+      Authentication__EnableLocalDevelopmentIdentity: "true"
+      Banking__DatabasePath: /data/bp-demo.db
+    volumes:
+      - banking_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  banking_data:

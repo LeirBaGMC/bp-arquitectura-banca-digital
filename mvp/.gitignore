@@ -1,0 +1,12 @@
+bin/
+obj/
+api/Data/*.db
+api/Data/*.db-shm
+api/Data/*.db-wal
+api/run/
+web/node_modules/
+web/dist/
+api/wwwroot/
+.env
+.env.*
+!.env.example

@@ -1,0 +1,43 @@
+@api_HostAddress = http://localhost:5080
+@idempotencyKey = 90971c8e-e3c1-4c63-b54b-2343ad228002
+
+### Consulta correcta: 200 OK
+GET {{api_HostAddress}}/api/accounts
+Accept: application/json
+
+### Ruta de API inexistente: 404 Problem Details
+GET {{api_HostAddress}}/api/no-existe
+Accept: application/json
+
+### Auditoria sin rol Operations: 403 Problem Details
+GET {{api_HostAddress}}/api/audit
+Accept: application/json
+
+### Transferencia invalida: 400 Problem Details con campos
+POST {{api_HostAddress}}/api/transfers
+Content-Type: application/json
+
+{
+  "sourceAccountId": "ACC-001",
+  "destinationType": "OWN",
+  "destinationAccountId": "ACC-002",
+  "amount": 3000.00,
+  "idempotencyKey": "no-es-guid"
+}
+
+### Transferencia valida: primera solicitud 202 Accepted; repite la misma clave para verificar 200 duplicada
+POST {{api_HostAddress}}/api/transfers
+Content-Type: application/json
+
+{
+  "sourceAccountId": "ACC-001",
+  "destinationType": "OWN",
+  "destinationAccountId": "ACC-002",
+  "amount": 10.00,
+  "description": "Aporte mensual",
+  "idempotencyKey": "{{idempotencyKey}}"
+}
+
+### Comprueba la referencia de depuracion en X-Request-Id y traceId del JSON
+GET {{api_HostAddress}}/api/transfers
+Accept: application/json

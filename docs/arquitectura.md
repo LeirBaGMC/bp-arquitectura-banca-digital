@@ -11,6 +11,19 @@
 
 La SPA y la app móvil son dos clientes del MVP y comparten los servicios backend. La PWA se documenta como alternativa sugerida por el profesor, no como reemplazo automático de la app móvil en el diseño base.
 
+## Marco normativo y controles de cumplimiento
+
+La jurisdicción de BP aún debe confirmarse; por ello, esta sección es una base de análisis y no una conclusión legal. Si BP opera en Ecuador, el diseño debe validarse, como mínimo, contra:
+
+- **LOPDP y su Reglamento General:** definir base legitimadora y finalidad del tratamiento, minimización y retención, atención de derechos, contratos con encargados, transferencias internacionales y salvaguardas para datos biométricos del onboarding. Aplicar privacidad desde el diseño y evaluar formalmente el riesgo del tratamiento facial.
+- **Normativa de la Superintendencia de Bancos:** revisar la Codificación de Normas de Control vigente, en particular la gestión del riesgo operativo, seguridad de información y ciberseguridad, continuidad del negocio, canales electrónicos y servicios provistos por terceros. El control de incidentes debe contemplar detección, registro, respuesta, recuperación y notificación regulatoria cuando corresponda.
+- **Protección al consumidor financiero:** informar condiciones, costos, estados y mecanismos de reclamo; conservar trazabilidad de instrucciones y operaciones.
+- **PCI DSS:** incluirlo en el análisis únicamente si el alcance procesa, transmite o almacena datos de tarjetas o afecta el entorno de datos de tarjeta.
+
+Como marcos de apoyo técnico se pueden mapear controles a ISO/IEC 27001/27002 y NIST CSF; no sustituyen las obligaciones regulatorias. Legal y Cumplimiento deben confirmar aplicabilidad, versiones vigentes, plazos de retención, residencia de datos y notificación de incidentes antes de producción.
+
+Referencias oficiales para la hipótesis Ecuador: [SPDP - normativa de protección de datos](https://www.spdp.gob.ec/docs/proteccion-de-datos-personales/general/normativa/), [Superintendencia de Bancos - Codificación de Normas](https://www.superbancos.gob.ec/bancos/normativa-de-la-sb/), [SB - gestión del riesgo operativo](https://www.superbancos.gob.ec/bancos/descargas/30300/) y [SB - derechos del usuario financiero](https://www.superbancos.gob.ec/bancos/codigo-de-derechos-del-usuario-financiero/).
+
 ## 2. Diagrama de contexto
 
 ```mermaid
@@ -58,13 +71,17 @@ flowchart LR
         CUSTOMER[Servicio de cliente]
         MOVES[Servicio de movimientos]
         TRANSFER[Servicio de transferencias]
+        WORKER[Worker de ejecución de transferencias]
         ONBOARD[Servicio de onboarding]
         NOTIFY[Orquestador de notificaciones]
         AUDIT[Servicio de auditoría]
         RDS[RDS PostgreSQL Multi-AZ<br/>estado de operación y outbox]
         READ[DynamoDB<br/>proyección persistida de consulta frecuente]
+        RELAY[Relay outbox]
         BUS[EventBridge]
-        QUEUES[SQS + DLQ<br/>transferencias, auditoría, notificaciones]
+        QTRANSFER[SQS ejecución + DLQ]
+        QAUDIT[SQS auditoría + DLQ]
+        QNOTIFY[SQS notificaciones + DLQ]
         AUDITDB[DynamoDB de auditoría]
         ARCHIVE[S3 Object Lock<br/>archivo de auditoría]
         OBS[CloudWatch + CloudTrail]
@@ -101,9 +118,13 @@ flowchart LR
     TRANSFER --> RDS
     ONBOARD --> FACE
     ONBOARD --> IDP
-    RDS --> BUS --> QUEUES
-    QUEUES --> NOTIFY
-    QUEUES --> AUDIT
+    RDS --> RELAY --> BUS
+    BUS --> QTRANSFER --> WORKER
+    WORKER --> CORE
+    WORKER --> PAYMENT
+    WORKER --> RDS
+    BUS --> QAUDIT --> AUDIT
+    BUS --> QNOTIFY --> NOTIFY
     AUDIT --> AUDITDB --> ARCHIVE
     NOTIFY --> MAIL
     NOTIFY --> PUSH
@@ -190,7 +211,13 @@ sequenceDiagram
     end
     G->>G: Validar firma, issuer, audience, expiración y scopes
     G->>S: Enrutar solicitud autorizada
-    S-->>C: Respuesta
+    S-->>G: Respuesta
+    alt SPA
+        G-->>B: Respuesta
+        B-->>C: Respuesta y cookie de sesión
+    else App móvil
+        G-->>C: Respuesta
+    end
 ```
 
 Se recomienda passkey o aplicación autenticadora si el producto de identidad lo permite. El código por correo puede usarse para verificar dirección o recuperación, pero no se presenta como MFA robusto: NIST señala que el correo no debe utilizarse como autenticador fuera de banda.
@@ -223,7 +250,13 @@ sequenceDiagram
         ON->>IDP: Crear o activar identidad
         IDP-->>ON: Identidad habilitada
         ON->>AUD: Registrar activación
-        ON-->>APP: Configurar autenticador y terminar alta
+        ON-->>APP: Solicitar registro de credencial o passkey
+        APP->>IDP: Registrar credencial inicial y factor MFA
+        IDP-->>APP: Credencial activada
+        APP->>IDP: Iniciar sesión con la credencial recién registrada
+        IDP-->>APP: Sesión autenticada
+        APP-->>U: Alta terminada y acceso habilitado
+        Note over APP,IDP: Biometría local solo desbloquea una credencial del dispositivo; el proveedor facial verifica identidad durante onboarding
     else Revisión o rechazo
         ON-->>APP: Informar estado y próximos pasos
         ON->>AUD: Registrar revisión o rechazo
@@ -344,7 +377,14 @@ CloudWatch concentra métricas, logs y alarmas; CloudTrail registra acciones de 
 - Retención, acceso, integridad y clasificación de eventos de auditoría.
 - RTO/RPO, calendario de respaldos y procedimiento probado de recuperación.
 - Tallas y volúmenes de AWS para terminar el cálculo de costos.
-- Normativa financiera y privacidad que se incluirá tras confirmar jurisdicción.
+- Confirmar jurisdicción de BP y validar el marco normativo de la sección anterior con Legal y Cumplimiento.
+- Confirmar proceso de emisión/activación de credenciales del IdP y método MFA disponible.
+
+## 11. Persistencia frecuente y auditoría
+
+La consulta frecuente usa una **proyección de lectura CQRS** en DynamoDB: el Core y el sistema de detalle siguen siendo fuentes maestras; los eventos o lecturas controladas actualizan la proyección con versión y fecha de actualización. El servicio de consulta puede usar Cache-Aside para datos calientes con TTL breve, siempre que muestre o controle su frescura y nunca autorice transferencias usando una proyección potencialmente obsoleta.
+
+La auditoría se alimenta mediante una cola dedicada para que sus consumidores no compitan con notificaciones. Cada evento conserva identificador de correlación, actor, acción, recurso, instante, resultado y origen; se minimizan datos personales y secretos. El almacenamiento separado y S3 Object Lock apoyan integridad y retención, mientras que acceso restringido, cifrado y revisión de retención quedan sujetos a política y regulación aplicables.
 
 ## Fuentes técnicas
 

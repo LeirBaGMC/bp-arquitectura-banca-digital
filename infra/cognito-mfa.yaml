@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Cognito user pool for BP Digital with required MFA, TOTP, user-verified passkeys, and public OAuth clients.
+
+Parameters:
+  CognitoDomainPrefix:
+    Type: String
+    Description: Globally unique lowercase prefix for the Cognito hosted sign-in domain.
+    AllowedPattern: '^[a-z0-9](?:[a-z0-9-]{0,18}[a-z0-9])?$'
+    MinLength: 1
+    MaxLength: 20
+  SpaCallbackUrl:
+    Type: String
+    Default: http://localhost:5173/
+    Description: SPA callback URL; override with the deployed HTTPS URL outside local development.
+
+Resources:
+  BankingUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: bp-digital-users
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      UsernameConfiguration:
+        CaseSensitive: false
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      MfaConfiguration: ON
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+      UserPoolTier: ESSENTIALS
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 1
+        SignInPolicy:
+          AllowedFirstAuthFactors:
+            - PASSWORD
+            - WEB_AUTHN
+      WebAuthnFactorConfiguration: MULTI_FACTOR_WITH_USER_VERIFICATION
+      WebAuthnRelyingPartyID: !Sub '${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com'
+      WebAuthnUserVerification: required
+      DeletionProtection: ACTIVE
+
+  BankingApiResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      UserPoolId: !Ref BankingUserPool
+      Identifier: bp
+      Name: BP Digital API
+      Scopes:
+        - ScopeName: banking-api
+          ScopeDescription: Access to BP Digital banking API.
+
+  MobileAppClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: BankingApiResourceServer
+    Properties:
+      ClientName: bp-digital-mobile
+      UserPoolId: !Ref BankingUserPool
+      GenerateSecret: false
+      EnableTokenRevocation: true
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows:
+        - ALLOW_USER_AUTH
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - bp/banking-api
+      CallbackURLs:
+        - bpdigital://oauth2redirect
+      LogoutURLs:
+        - bpdigital://oauth2redirect
+      SupportedIdentityProviders:
+        - COGNITO
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 1
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+
+  SpaAppClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: BankingApiResourceServer
+    Properties:
+      ClientName: bp-digital-spa
+      UserPoolId: !Ref BankingUserPool
+      GenerateSecret: false
+      EnableTokenRevocation: true
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows:
+        - ALLOW_USER_AUTH
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - bp/banking-api
+      CallbackURLs:
+        - !Ref SpaCallbackUrl
+      LogoutURLs:
+        - !Ref SpaCallbackUrl
+      SupportedIdentityProviders:
+        - COGNITO
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 1
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+
+  CognitoDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref BankingUserPool
+      Domain: !Ref CognitoDomainPrefix
+      ManagedLoginVersion: 2
+
+Outputs:
+  UserPoolId:
+    Description: Set Authentication__UserPoolId if needed for admin provisioning.
+    Value: !Ref BankingUserPool
+  UserPoolIssuer:
+    Description: Set Authentication__Authority on the API.
+    Value: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${BankingUserPool}'
+  HostedUiDomain:
+    Description: Set EXPO_PUBLIC_COGNITO_DOMAIN in the mobile app and Authentication__Domain on the API.
+    Value: !Sub 'https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com'
+  MobileClientId:
+    Description: Set EXPO_PUBLIC_COGNITO_CLIENT_ID in the mobile app and Authentication__ClientId on the API.
+    Value: !Ref MobileAppClient
+  SpaClientId:
+    Description: Set VITE_COGNITO_CLIENT_ID in the SPA configuration.
+    Value: !Ref SpaAppClient
+  ApiScope:
+    Description: Set EXPO_PUBLIC_COGNITO_SCOPE and Authentication__RequiredScope.
+    Value: bp/banking-api

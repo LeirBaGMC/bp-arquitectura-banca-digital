@@ -1,0 +1,17 @@
+region,service,metric,unit,provisional_value,confirmation
+us-east-1,Amazon Cognito,monthly active users,MAU,1000,unconfirmed workload assumption
+us-east-1,Amazon API Gateway,API requests,requests per month,10000,unconfirmed workload assumption
+us-east-1,AWS WAF,web ACL,ACL,1,confirm rules and request volume
+us-east-1,Amazon ECS Fargate,API tasks,task-hours per month,1460,2 tasks x 730 hours; confirm CPU and memory
+us-east-1,Application Load Balancer,load balancer,LB-hours per month,730,confirm LCU and VPC Link
+us-east-1,Amazon RDS for PostgreSQL,Multi-AZ database,instance-hours per month,1460,confirm class and allocated storage
+us-east-1,Amazon DynamoDB,read/write requests,requests per month,100000,confirm read/write split and storage
+us-east-1,Amazon SQS,queue requests,requests per month,20000,confirm retries and dead-letter queue
+us-east-1,Amazon Rekognition Face Liveness,liveness sessions,sessions per month,100,unconfirmed workload assumption
+us-east-1,Amazon SNS mobile push,device endpoints,endpoints,1000,confirm FCM/APNs messages
+us-east-1,Amazon SES,email notifications,emails per month,10000,confirm channel and recipient volume
+us-east-1,Amazon S3,logs and backups,GB-month,20,confirm retention and Object Lock
+us-east-1,Amazon CloudFront,delivery,GB transferred per month,50,confirm user traffic and request count
+us-east-1,Amazon CloudWatch,logs ingested,GB per month,5,"confirm retention, metrics and alarms"
+us-east-1,AWS CloudTrail,management events,event history plus trail,1,confirm trail count and S3 retention
+us-east-1,DR secondary region,duplicated services,separate scenario,1,price separately after RTO/RPO approval

@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mvp/web/package-lock.json
+      - name: Restore API
+        run: dotnet restore mvp/api/api.csproj
+      - name: Build web
+        working-directory: mvp/web
+        run: npm ci && npm audit --audit-level=high && npm run build
+      - name: Build mobile
+        working-directory: mvp/mobile
+        run: npm ci && npm audit --audit-level=high && npm run typecheck && npx expo export --platform android
+      - name: Build API
+        run: dotnet build mvp/api/api.csproj --no-restore
+      - name: Smoke test API
+        run: pwsh -File mvp/scripts/test-api.ps1

@@ -31,4 +31,10 @@ sequenceDiagram
     end
     G->>G: Validar firma, issuer, audience, expiración y scopes
     G->>S: Enrutar solicitud autorizada
-    S-->>C: Respuesta
+    S-->>G: Respuesta
+    alt SPA
+        G-->>B: Respuesta
+        B-->>C: Respuesta con cookie de sesión
+    else App móvil
+        G-->>C: Respuesta
+    end
