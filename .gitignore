@@ -1,3 +1,4 @@
+# Editor and build output
 .vs/
 **/bin/
 **/obj/
@@ -5,23 +6,26 @@
 **/.expo/
 **/dist/
 **/web-build/
-/.nuget/
-/tmp/
-/output/pdf/arquitectura_banca_digital_bp.pdf
-**/*.db
-**/*.db-shm
-**/*.db-wal
+/backend/wwwroot/
+/backend/run/
+/backend/Data/
+
+# Local configuration and data
 **/.env
 **/.env.*
 !**/.env.example
+*.db
+*.db-shm
+*.db-wal
 *.user
 *.suo
 *.log
+
+# Local-only material excluded from the GitHub project
+/.github/
 /docs/
-/output/*.zip
-/output/pdf/*.aux
-/output/pdf/*.out
-/output/pdf/*.toc
-/output/pdf/*.fls
-/output/pdf/*.fdb_latexmk
-/output/pdf/*.synctex.gz
+/infra/
+/mvp/
+/output/
+/tmp/
+/.nuget/

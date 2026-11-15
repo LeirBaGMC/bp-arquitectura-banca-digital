@@ -1,45 +1,48 @@
 # Arquitectura de banca digital BP
 
-Propuesta académica de arquitectura y MVP local para una plataforma de banca por internet. El repositorio contiene el código ejecutable y el PDF de entrega. No se han desplegado recursos AWS ni se procesan fondos reales.
+Propuesta académica de arquitectura y MVP local para una plataforma de banca por internet. Este repositorio contiene el código de la API, la aplicación web y la aplicación móvil. No se han desplegado recursos de AWS ni se procesan fondos reales.
 
-## Estructura del repositorio
+## Estructura
 
-| Ruta | Contenido |
-|---|---|
-| `mvp/api/` | API ASP.NET Core .NET 10 y persistencia local SQLite. |
-| `mvp/web/` | SPA React, TypeScript y Vite. |
-| `mvp/mobile/` | Aplicación multiplataforma React Native con Expo. |
-| `infra/cognito-mfa.yaml` | Plantilla CloudFormation para configurar Cognito; aún no desplegada. |
-| `output/pdf/reporte.pdf` | Informe de entrega con arquitectura C4, flujos BPMN, seguridad, costos y brechas. |
-| `.github/workflows/ci.yml` | Compilación y verificaciones automáticas para API, web y móvil. |
+- backend/: API ASP.NET Core sobre .NET 10 y persistencia local SQLite.
+- frontend/: SPA en React, TypeScript y Vite.
+- mobile/: aplicación multiplataforma en React Native con Expo.
 
-## Alcance y estado
+## Requisitos
 
-- La API y la SPA usan datos locales; Core bancario y sistema de detalle no están conectados.
-- Las transferencias propias tienen procesamiento local e idempotencia. Las interbancarias quedan pendientes de un proveedor real.
-- La autenticación local sirve para desarrollo. Cognito, MFA y aislamiento multiusuario requieren configuración y pruebas reales.
-- El onboarding tiene consentimiento y contrato de API; no está conectado el SDK de verificación facial.
-- Las notificaciones locales funcionan como demostración; push remoto y segundo canal están pendientes.
-- AWS, alta disponibilidad, recuperación ante desastres y monitoreo están documentados como arquitectura objetivo, no desplegados.
-- El costo AWS es provisional y debe validarse con AWS Pricing Calculator.
+- .NET 10 SDK
+- Node.js y npm
 
-## Compilación y pruebas
+## Ejecución local
+
+### API
 
 Desde la raíz del repositorio, ejecuta:
 
-```powershell
-dotnet restore .\mvp\api\api.csproj
-dotnet build .\mvp\api\api.csproj --no-restore
-npm --prefix .\mvp\web ci
-npm --prefix .\mvp\web run build
-Push-Location .\mvp\mobile
-npm ci
-npm run typecheck
-npx expo export --platform android
-Pop-Location
-pwsh -File .\mvp\scripts\test-api.ps1
-```
+    dotnet restore .\backend\api.csproj
+    dotnet run --project .\backend\api.csproj --urls http://0.0.0.0:5080
 
-La prueba funcional de la API utiliza una base SQLite temporal y una identidad local de desarrollo. Las pruebas locales no sustituyen la validación con Cognito, proveedores bancarios, dispositivos físicos ni recursos AWS.
+### Aplicación web
 
-Consulta [la guía del MVP](mvp/README.md) para el desarrollo local y las rutas disponibles.
+En otra terminal:
+
+    npm --prefix .\frontend ci
+    npm --prefix .\frontend run dev
+
+Abre http://127.0.0.1:5173. Vite reenvía las solicitudes /api a la API en el puerto 5080.
+
+### Aplicación móvil
+
+Crea el archivo local de variables y, si usas un teléfono físico, cambia la URL por la dirección LAN de tu computadora:
+
+    Copy-Item .\mobile\.env.example .\mobile\.env
+    Push-Location .\mobile
+    npm ci
+    npx expo start
+    Pop-Location
+
+El archivo de ejemplo usa 10.0.2.2, la dirección del equipo anfitrión desde el emulador Android. Para un dispositivo físico configura EXPO_PUBLIC_API_URL con http://<IP-LAN-de-tu-computadora>:5080.
+
+## Alcance actual
+
+La API usa datos de demostración y SQLite local. Las integraciones con Core bancario, proveedores interbancarios, Cognito, verificación facial, notificaciones remotas y servicios de AWS requieren configuración e implementación adicionales.

@@ -12,7 +12,7 @@ export class ApiError extends Error {
 }
 
 export async function requestApi<T>(path: string, init?: RequestInit): Promise<T> {
-  if (!baseUrl) throw new Error('Configura EXPO_PUBLIC_API_URL en mvp/mobile/.env.');
+  if (!baseUrl) throw new Error('Configura EXPO_PUBLIC_API_URL en mobile/.env.');
   const token = await readAccessToken();
   let response: Response;
   let body: { detail?: string; title?: string; traceId?: string };
