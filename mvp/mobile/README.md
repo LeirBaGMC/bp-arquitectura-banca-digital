@@ -48,7 +48,7 @@ Para iniciar sesión localmente, establece `EXPO_PUBLIC_LOCAL_AUTH=true` solo en
 
 ## Cognito
 
-Consulta [MFA y passkeys con Cognito](../../docs/mfa-cognito.md) para la configuración, la plantilla CloudFormation y las pruebas pendientes. `infra/cognito-mfa.yaml` define el scope `bp/banking-api`; la plantilla todavía no se ha desplegado.
+Consulta la [plantilla Cognito MFA](../../infra/cognito-mfa.yaml) para la configuración de Cognito y el scope `bp/banking-api`. La plantilla todavía no se ha desplegado.
 
 Define `EXPO_PUBLIC_COGNITO_DOMAIN`, `EXPO_PUBLIC_COGNITO_CLIENT_ID` y `EXPO_PUBLIC_COGNITO_SCOPE`. Registra `bpdigital://oauth2redirect` como callback del app client y habilita Authorization Code Grant, PKCE (S256), `openid`, `email` y el scope de la API. La app guarda el access token y su expiración con `expo-secure-store`; no se incluye client secret en el móvil.
 

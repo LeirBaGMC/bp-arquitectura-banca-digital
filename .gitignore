@@ -17,6 +17,7 @@
 *.user
 *.suo
 *.log
+/docs/
 /output/*.zip
 /output/pdf/*.aux
 /output/pdf/*.out

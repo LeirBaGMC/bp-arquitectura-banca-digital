@@ -1,32 +1,45 @@
 # Arquitectura de banca digital BP
 
-Propuesta académica de arquitectura y MVP local para una plataforma de banca por internet. Incluye el informe final en PDF, su fuente LaTeX, diagramas C4 y modelos BPMN editables. No se han desplegado recursos AWS ni se procesan fondos reales.
+Propuesta académica de arquitectura y MVP local para una plataforma de banca por internet. El repositorio contiene el código ejecutable y el PDF de entrega. No se han desplegado recursos AWS ni se procesan fondos reales.
 
-## Alcance del MVP
+## Estructura del repositorio
 
-- Dos clientes: SPA web y aplicación móvil multiplataforma.
-- Consulta de información del cliente desde Core y desde el sistema independiente de detalle.
-- Consulta de movimientos, transferencias propias e interbancarias.
-- Autenticación con OAuth 2.0 / OpenID Connect y MFA.
-- Onboarding móvil con verificación facial.
-- Auditoría de acciones y notificaciones mediante al menos dos canales.
-- Despliegue propuesto en AWS, con alta disponibilidad, monitoreo y recuperación.
+| Ruta | Contenido |
+|---|---|
+| `mvp/api/` | API ASP.NET Core .NET 10 y persistencia local SQLite. |
+| `mvp/web/` | SPA React, TypeScript y Vite. |
+| `mvp/mobile/` | Aplicación multiplataforma React Native con Expo. |
+| `infra/cognito-mfa.yaml` | Plantilla CloudFormation para configurar Cognito; aún no desplegada. |
+| `output/pdf/reporte.pdf` | Informe de entrega con arquitectura C4, flujos BPMN, seguridad, costos y brechas. |
+| `.github/workflows/ci.yml` | Compilación y verificaciones automáticas para API, web y móvil. |
 
-## Archivos
+## Alcance y estado
 
-- [Diseño y diagramas](docs/arquitectura.md): contexto, contenedores, componentes, secuencias y continuidad.
-- [Decisiones arquitectónicas](docs/decisiones.md): alternativas y justificaciones.
-- [Temas de ingeniería](docs/temas-de-ingenieria.md): aplicación de DevOps, seguridad, HTTP, arquitectura, cloud, datos, QA y gestión; incluye códigos de estado para depuración.
-- [Validación del MVP](docs/validacion-mvp.md): resultados de las pruebas frente a los requisitos de las imágenes y brechas pendientes.
-- [Auditoría técnica](docs/auditoria-tecnica-2026-11-15.md): hallazgos de API, web, móvil, OAuth/MFA, seguridad y DevOps.
-- [Informe final en PDF](output/pdf/reporte.pdf): auditoría, C4, flujos BPMN, verificación y plan AWS.
-- [Fuente del informe y compilación](docs/reporte/README.md): LaTeX, figuras y modelos BPMN 2.0 editables.
-- [Costos AWS](docs/costos-aws.md): pendiente completar en conjunto con AWS Pricing Calculator.
-- [MVP ejecutable](mvp/README.md): aplicación local con backend C# / ASP.NET Core, SPA React + TypeScript + Vite y app móvil React Native + Expo.
-- [Fuentes Mermaid](docs/diagramas/): diagramas editables por separado.
+- La API y la SPA usan datos locales; Core bancario y sistema de detalle no están conectados.
+- Las transferencias propias tienen procesamiento local e idempotencia. Las interbancarias quedan pendientes de un proveedor real.
+- La autenticación local sirve para desarrollo. Cognito, MFA y aislamiento multiusuario requieren configuración y pruebas reales.
+- El onboarding tiene consentimiento y contrato de API; no está conectado el SDK de verificación facial.
+- Las notificaciones locales funcionan como demostración; push remoto y segundo canal están pendientes.
+- AWS, alta disponibilidad, recuperación ante desastres y monitoreo están documentados como arquitectura objetivo, no desplegados.
+- El costo AWS es provisional y debe validarse con AWS Pricing Calculator.
 
-GitHub renderiza los diagramas Mermaid incluidos en los archivos Markdown. Para seguir desde otra computadora, clona este repositorio y edita los `.md` o `.mmd`.
+## Compilación y pruebas
 
-## Estado
+Desde la raíz del repositorio, ejecuta:
 
-MVP local verificado: API compilada y suite de integración aprobada; SPA y bundle Android Expo compilados. La verificación facial, MFA Cognito y notificaciones push remotas están preparados parcialmente, pero requieren proveedores y pruebas reales. Pendientes: completar costos junto con AWS Pricing Calculator, validar interfaces/SLA de sistemas externos, definir RTO/RPO y probar en dispositivos.
+```powershell
+dotnet restore .\mvp\api\api.csproj
+dotnet build .\mvp\api\api.csproj --no-restore
+npm --prefix .\mvp\web ci
+npm --prefix .\mvp\web run build
+Push-Location .\mvp\mobile
+npm ci
+npm run typecheck
+npx expo export --platform android
+Pop-Location
+pwsh -File .\mvp\scripts\test-api.ps1
+```
+
+La prueba funcional de la API utiliza una base SQLite temporal y una identidad local de desarrollo. Las pruebas locales no sustituyen la validación con Cognito, proveedores bancarios, dispositivos físicos ni recursos AWS.
+
+Consulta [la guía del MVP](mvp/README.md) para el desarrollo local y las rutas disponibles.
