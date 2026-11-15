@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -7,6 +8,7 @@ using Microsoft.AspNetCore.RateLimiting;
 public sealed class OnboardingController : ControllerBase
 {
     [HttpPost("sessions")]
+    [Authorize(Policy = "StrongMfa")]
     [EnableRateLimiting("identity-onboarding")]
     [RequestSizeLimit(1024)]
     public IActionResult CreateFaceVerificationSession([FromBody] FaceVerificationConsent request)

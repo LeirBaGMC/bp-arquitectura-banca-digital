@@ -1,34 +1,28 @@
 flowchart LR
-    CLIENT[SPA o app móvil] --> WAF[AWS WAF]
-    WAF --> API[API Gateway]
-    API --> LINK[VPC Link]
-    LINK --> ALB[Balanceador interno]
-    ALB --> BFF[BFF web]
-    ALB --> CUSTOMER[Servicio de cliente]
-    ALB --> MOVES[Servicio de movimientos]
-    ALB --> TRANSFER[Servicio de transferencias]
-    ALB --> ONBOARD[Servicio de onboarding]
-    CUSTOMER --> CORE[Core]
-    CUSTOMER --> DETAIL[Sistema de detalle]
-    CUSTOMER <--> READ[DynamoDB proyección frecuente]
-    MOVES --> CORE
-    TRANSFER --> CORE
-    TRANSFER --> PAYMENT[Red interbancaria]
-    TRANSFER --> DB[(RDS PostgreSQL)]
-    ONBOARD --> FACE[Proveedor facial]
-    ONBOARD --> IDP[IdP]
-    DB --> RELAY[Relay outbox]
-    RELAY --> BUS[EventBridge]
-    BUS --> QPAY[SQS ejecución + DLQ]
-    BUS --> QA[SQS auditoría + DLQ]
-    BUS --> QN[SQS notificaciones + DLQ]
-    QPAY --> WORKER[Worker de transferencias]
-    WORKER --> CORE
-    WORKER --> PAYMENT
-    WORKER --> DB
-    QA --> AUDIT[Servicio de auditoría]
-    QN --> NOTIFY[Servicio de notificaciones]
-    AUDIT --> AUDITDB[(DynamoDB auditoría)]
-    AUDITDB --> ARCHIVE[S3 Object Lock]
-    NOTIFY --> EMAIL[Correo]
-    NOTIFY --> PUSH[Push o SMS]
+    CLIENT[SPA o app movil]
+    WAF[AWS WAF]
+    GATE[API Gateway]
+    BFF[BFF web]
+    AUTH[Validacion JWT y scopes]
+    DOMAIN[Servicios de dominio: cliente movimientos transferencias onboarding]
+    DATA[Repositorios: SQLite MVP RDS objetivo]
+    OUTBOX[Outbox y relay]
+    BUS[EventBridge y SQS DLQ]
+    WORKER[Worker transferencias]
+    AUDIT[Consumidor auditoria a S3 Object Lock]
+    NOTICE[Consumidor notificaciones]
+    PROVIDERS[Core pagos Cognito biometria correo push]
+    CLIENT -->|TLS HTTPS JSON| WAF
+    WAF -->|TLS| GATE
+    GATE -->|VPC Link privado| BFF
+    GATE -->|VPC Link privado| AUTH
+    BFF -->|sesion segura CSRF| AUTH
+    AUTH -->|JWT issuer audience sub scope ACR AMR| DOMAIN
+    DOMAIN -->|SQL parametrizado TLS| DATA
+    DOMAIN -->|OIDC OAuth2 TLS| PROVIDERS
+    DATA -->|misma transaccion| OUTBOX
+    OUTBOX -->|evento TLS IAM minimo privilegio| BUS
+    BUS -->|reintentos DLQ| WORKER
+    BUS -->|cola dedicada| AUDIT
+    BUS -->|cola dedicada| NOTICE
+    WORKER -->|idempotencia API autenticada| PROVIDERS

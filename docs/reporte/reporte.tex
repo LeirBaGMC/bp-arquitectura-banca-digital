@@ -6,6 +6,7 @@
 \usepackage[a4paper,margin=2.1cm,headheight=15pt]{geometry}
 \usepackage{xcolor}
 \usepackage{graphicx}
+\usepackage{pdflscape}
 \usepackage{booktabs,tabularx,longtable,array}
 \usepackage{enumitem}
 \usepackage{float}
@@ -73,7 +74,7 @@ El repositorio contiene una API ASP.NET Core, una SPA web React y una app móvil
 Esta revisión incorpora una pantalla móvil de alta desde Ajustes, consentimiento explícito y un contrato HTTP autenticado para crear una sesión facial. El servicio devuelve HTTP 503 con el código FACE\_VERIFICATION\_NOT\_CONFIGURED hasta que se conecte y evalúe un proveedor nativo. No se captura ni almacena una selfie. La app puede solicitar permiso del sistema y emitir una notificación local de comprobación; la entrega push remota sigue pendiente.
 
 \begin{riskbox}
-El MVP todavía no es apto para producción ni para mover fondos. MFA real, aislamiento multiusuario con tokens Cognito, validación de infraestructura, verificación facial real, push remoto, transferencia interbancaria y costos finales de AWS no se han probado. La estimación de costos se completará junto con el usuario en AWS Pricing Calculator; este informe no inventa un subtotal.
+El MVP todavía no es apto para producción ni para mover fondos. MFA real, aislamiento multiusuario con tokens Cognito, validación de infraestructura, verificación facial real, push remoto, transferencia interbancaria y pruebas de costos reales en AWS no se han completado. El informe incluye una estimación provisional con supuestos que debe validarse en AWS Pricing Calculator.
 \end{riskbox}
 
 \section*{Estado de cierre}
@@ -86,7 +87,7 @@ SPA React & Compilación correcta; `npm audit` informó 0 vulnerabilidades. \\
 App móvil & Typecheck aprobado en una instalación temporal; faltan pruebas en dispositivo y flujo Cognito real. \\
 Alta facial & Consentimiento y contrato preparados; proveedor desactivado hasta integrar SDK nativo, cotejo documental y revisión. \\
 Notificaciones & Buzón API y prueba local del sistema operativo; FCM/APNs/SNS no conectados. \\
-AWS y costos & Código/diagramas de preparación; sin recursos desplegados ni total aprobado de Pricing Calculator. \\
+AWS y costos & Escenario mensual provisional de USD 251.21; falta validar con AWS Pricing Calculator. Sin recursos desplegados. \\
 \bottomrule
 \end{tabularx}
 
@@ -97,44 +98,101 @@ Los datos de origen, cuentas y movimientos provienen de la base de desarrollo. L
 
 \chapter{Arquitectura propuesta -- C4}
 \section{Contexto}
-El cliente de banca accede desde web o móvil a una capa HTTP autenticada. La API valida token, scope y nivel ACR, consulta la fuente Core y el sistema de detalle a través de adaptadores futuros, y delega operaciones asíncronas y notificaciones a colas y proveedores. El límite de confianza separa clientes públicos, API, proveedores de identidad, Core y servicios cloud.
+El cliente bancario usa la SPA web o la aplicación móvil para consultar cuentas y movimientos, autenticarse y solicitar transferencias. BP Digital es el sistema dentro del alcance. El Core bancario y el sistema de detalle se modelan como sistemas externos distintos: el primero aporta datos básicos, cuentas y productos; el segundo aporta movimientos y perfil ampliado. También se muestran por separado la red de pagos, el proveedor de identidad, el servicio de verificación facial y los proveedores de notificaciones.
 
-\begin{figure}[H]\centering\includegraphics[width=0.98\textwidth]{c4-contexto.png}\caption{C4 -- contexto y actores externos.}\end{figure}
+El diagrama de contexto mantiene el nivel de sistemas y personas recomendado por C4 y etiqueta el propósito de cada relación. Los canales llaman a BP Digital por HTTPS/JSON; la API usa OIDC/OAuth para identidad y adaptadores autenticados para Core, detalle, pagos y proveedores. Ningún cliente móvil o SPA accede directamente a esas dependencias. Todas las integraciones externas son objetivo de diseño; el MVP usa SQLite y no está conectado a ellas.
 
-\section{Contenedores y componentes}
-\begin{figure}[H]\centering\includegraphics[width=\textwidth]{c4-contenedores.png}\caption{C4 -- contenedores previstos; los adaptadores cloud son una arquitectura objetivo, no recursos desplegados.}\end{figure}
+\clearpage
+\begin{landscape}
+\thispagestyle{fancy}
+\begin{figure}[H]\centering\includegraphics[width=0.96\linewidth,height=0.82\textheight,keepaspectratio]{c4-contexto.pdf}\caption{C4 -- contexto del sistema; alcance, actores, dependencias y relaciones etiquetadas.}\end{figure}
+\end{landscape}
+\clearpage
 
-\begin{figure}[H]\centering\includegraphics[width=0.96\textwidth]{c4-componentes.png}\caption{C4 -- responsabilidades internas de la API y límites de proveedor.}\end{figure}
+\section{Contenedores}
+El diagrama de contenedores amplía BP Digital y muestra aplicaciones, API, almacenes y colas con sus responsabilidades y tecnologías. La SPA llega a través de CloudFront/WAF; la app móvil llama a API Gateway. La API ASP.NET Core aplica identidad, autorización y reglas de dominio. Para datos, consulta el Core y el sistema de detalle mediante adaptadores distintos; RDS PostgreSQL es la fuente transaccional y DynamoDB conserva una proyección no autoritativa de perfil/actividad consultada con frecuencia. Esa proyección tiene versión, marca de frescura y TTL; eventos de cambio la actualizan y la API consulta la fuente autoritativa cuando está vencida o ausente. No se usa la proyección para autorizar, calcular saldos ni debitar.
+
+Las escrituras y acciones auditables generan eventos mediante transactional outbox. EventBridge enruta a colas separadas de transferencias, auditoría y notificaciones, cada una con reintentos, idempotencia y DLQ. El consumidor de auditoría escribe en almacenamiento inmutable; los avisos salen por dos canales independientes, push y correo. Estas integraciones y contenedores cloud son propuestos, no desplegados en el MVP.
+
+\clearpage
+\begin{landscape}
+\thispagestyle{fancy}
+\begin{figure}[H]\centering\includegraphics[width=0.96\linewidth,height=0.82\textheight,keepaspectratio]{c4-contenedores.pdf}\caption{C4 -- contenedores de BP Digital, responsabilidades, tecnologías y relaciones.}\end{figure}
+\end{landscape}
+\clearpage
+
+\section{Componentes}
+El diagrama de componentes tiene como alcance un único contenedor: la API ASP.NET Core. API Gateway/WAF queda fuera como contenedor de entrada, y los demás servicios aparecen como dependencias. Controllers validan contratos; autorización verifica JWT (issuer, audiencia, tipo, subject, scopes y ACR/AMR); los casos de uso delegan en componentes separados para clientes, movimientos, transferencias y onboarding. Puertos/adaptadores integran Core, detalle, red de pagos y proveedor facial; repositorios usan consultas parametrizadas.
+
+Un interceptor genera un evento de auditoría por acción de cliente, con actor, acción, recurso, resultado, timestamp y correlation ID, evitando almacenar secretos, tokens o datos biométricos innecesarios. El evento se publica junto con la operación local usando outbox; un consumidor separado lo persiste con cifrado, retención y controles de inmutabilidad. Las acciones de solo lectura también producen el registro auditable aunque no cambien datos de negocio. El diseño debe probar cobertura de eventos y conciliación entre peticiones y registros.
+
+La separación de dominios es una API modular, no una afirmación de microservicios ya desplegados. El MVP conserva una API modular, SQLite y un worker local; los adaptadores cloud son objetivos futuros.
+
+\clearpage
+\thispagestyle{fancy}
+\begin{figure}[H]\centering\includegraphics[width=0.94\textwidth,height=0.82\textheight,keepaspectratio]{c4-componentes.pdf}\caption{C4 -- componentes dentro del contenedor API y sistemas que los soportan.}\end{figure}
+\clearpage
+
+\section{Despliegue, alta disponibilidad y recuperación}
+El modelo C4 de despliegue ubica instancias de contenedores y nodos de infraestructura en un entorno objetivo concreto. C4 recomienda este diagrama para mostrar zonas, balanceadores, failover y servicios de infraestructura [17]. La región primaria distribuye un ALB interno y tareas ECS Fargate en dos zonas; el API Gateway REST usa VPC Link V2 para integrar el ALB privado, una configuración admitida por AWS [22]. Health checks y Auto Scaling reemplazan tareas no saludables y distribuyen carga. RDS Multi-AZ permite failover zonal; dos NAT Gateways evitan que una sola zona sea punto único de salida. Colas desacoplan fallas temporales de proveedores y DLQ conserva mensajes que requieren recuperación.
+
+CloudWatch, X-Ray y CloudTrail centralizan métricas, trazas, registros y actividad administrativa; alarmas activan escalamiento o reemplazo automático donde corresponda. IAM de mínimo privilegio, secretos administrados, TLS y cifrado con KMS protegen conexiones y datos. Backups con point-in-time recovery y copias cifradas entre regiones, junto con infraestructura como código y runbooks ensayados, forman la ruta de recuperación ante desastres. La región secundaria no está desplegada ni incluida en el cálculo actual.
+
+Los objetivos de recuperación (RTO/RPO), región secundaria, pruebas de restauración y SLO de latencia deben acordarse con el negocio y verificarse mediante pruebas de carga y simulacros; la arquitectura no garantiza cifras todavía no medidas. CloudFront reduce la latencia de entrega web, la ubicación conjunta de API y datos reduce saltos de red y la proyección de lectura descarga consultas repetidas. El costo provisional cubre alta disponibilidad Multi-AZ, pero excluye DR regional y debe actualizarse cuando se decidan esos objetivos.
+
+\clearpage
+\begin{landscape}
+\thispagestyle{fancy}
+\begin{figure}[H]\centering\includegraphics[width=0.96\linewidth,height=0.92\textheight,keepaspectratio]{c4-despliegue.pdf}\caption{C4 -- despliegue objetivo en AWS y alta disponibilidad en dos zonas.}\end{figure}
+\end{landscape}
+\clearpage
+\begin{landscape}
+\thispagestyle{fancy}
+\begin{figure}[H]\centering\includegraphics[width=0.96\linewidth,height=0.82\textheight,keepaspectratio]{c4-recuperacion.pdf}\caption{Recuperación ante desastres: copias cifradas, automatización y objetivos RTO/RPO por acordar.}\end{figure}
+\end{landscape}
+\clearpage
 
 \section{Decisiones arquitectónicas y justificación}
-\begin{enumerate}
-\item \textbf{Authorization Code con PKCE para SPA y móvil.} (a) Es adecuado para clientes públicos que no pueden custodiar un secreto; (b) vincula el código de autorización al iniciador de la petición y reduce su reutilización. La API valida firma/issuer, cliente, `token\_use=access`, `sub`, scope y claim `acr`.
-\item \textbf{MFA centralizado en Cognito con TOTP y passkey verificada por el dispositivo.} (a) Una política del proveedor cubre ambos clientes; (b) la API puede exigir el nivel ACR alcanzado y no confiar en una bandera enviada por el cliente. La huella, rostro o PIN local protegen la clave del autenticador; son distintos de una verificación KYC.
-\item \textbf{Transferencias y notificaciones desacopladas mediante outbox, cola, reintentos y DLQ.} (a) Un evento persistido evita perder una notificación si el proveedor cae; (b) idempotencia, límite de reintentos y cola de fallos dan trazabilidad y permiten recuperar mensajes sin bloquear la solicitud del cliente.
-\item \textbf{RDS como fuente transaccional y DynamoDB como proyección de lectura futura.} (a) El sistema de lectura no autoriza ni debita; (b) separación de carga favorece consultas frecuentes manteniendo saldo y titularidad en las fuentes de verdad. El MVP usa SQLite local, así que la solución AWS aún requiere adaptadores y validación.
-\item \textbf{Expo con desarrollo nativo para la app móvil.} (a) Comparte lenguaje y contratos TypeScript con la SPA; (b) development builds permiten módulos nativos que Expo Go no incluye. La verificación facial AWS necesita SDK nativo aprobado; no se resuelve con una alerta biométrica local.
-\section{Opciones para la aplicaci\'on m\'ovil}
-Se evaluaron React Native con Expo y Flutter. React Native/Expo conserva TypeScript y comparte tipos y contratos con la SPA existente; adem\'as permite usar development builds para incorporar m\'odulos nativos, por eso se mantiene en este MVP. Flutter tambi\'en es viable y ofrece widgets multiplataforma consistentes, pero introducir Dart y un segundo ecosistema aumentar\'ia la superficie de mantenimiento de este repositorio. La selecci\'on no elimina la necesidad de SDK nativo para liveness, passkeys o push remoto.
+Cada decision incluye al menos dos razones tecnicas y las alternativas consideradas. La arquitectura cloud es una propuesta preparada para una futura integracion; no se ha desplegado.
 
+\begin{enumerate}
+\item \textbf{SPA web y app móvil como dos canales.} Cumple el requisito de acceso desde web y móvil; mantener reglas y permisos en el backend evita divergencias entre canales. Se evaluó una PWA como alternativa de menor costo inicial, pero no cubre igual la experiencia de app nativa requerida.
+\item \textbf{React Native con Expo para móvil.} Reutiliza TypeScript, tipos y contratos existentes; development builds admiten módulos nativos para biometría/notificaciones. Se evaluó Flutter: es multiplataforma, pero agrega Dart y otro ecosistema al equipo.
+\item \textbf{API modular con límites de dominio y adaptadores.} Mantiene juntas las reglas de cada dominio y separa formatos de proveedores; permite sustituir Core/pagos/identidad sin reescribir los casos de uso. Se evaluó el monolito sin módulos (menos estructura, mayor acoplamiento) y microservicios por cada módulo (más despliegues y operación); el MVP conserva un monolito modular y deja la separación física para cuando se justifique.
+\item \textbf{BFF para la SPA web (objetivo).} Una sesión de servidor reduce exposición de tokens al JavaScript; centraliza cookies seguras y controles CSRF. Se evaluó SPA pública con PKCE directo, que reduce infraestructura pero requiere proteger tokens en el navegador; el BFF agrega costo operativo y debe implementarse antes de producción.
+\item \textbf{Authorization Code + PKCE S256 y OIDC.} PKCE vincula código y cliente público sin secreto; OIDC ofrece identidad estándar y scopes/claims permiten autorizar la API. Se evaluaron los flujos implícito y de credenciales del usuario, descartados por no ser apropiados para clientes actuales [18, 19].
+\item \textbf{MFA en el proveedor de identidad.} Una política central cubre SPA y móvil; la API puede exigir claims ACR/AMR verificados en el JWT en acciones sensibles, sin confiar en una bandera del cliente. Se evaluaron OTP por correo y biometría local como factor: correo no es un factor fuerte independiente y biometría local desbloquea una credencial, pero no sustituye por sí sola MFA del IdP.
+\item \textbf{Outbox, colas, idempotencia y DLQ para trabajo asíncrono.} Outbox evita perder eventos entre escritura y públicacion; clave idempotente, reintentos acotados y DLQ controlan duplicados, fallas y recuperación. Se evaluaron llamadas síncronas a todos los proveedores, más simples al inicio, pero acoplan disponibilidad y dificultan resolver timeouts de pagos.
+\item \textbf{RDS PostgreSQL como fuente transaccional objetivo.} Transacciones relacionales y restricciones protegen consistencia financiera; servicio administrado reduce tareas de mantenimiento del motor. Se evaluaron DynamoDB como fuente transaccional y mantener SQLite: la primera complica relaciones/consistencia del dominio y la segunda es local, no ofrece HA administrada ni se comparte de forma segura entre réplicas.
+\item \textbf{DynamoDB como proyección de lectura Cache-Aside/CQRS.} Separa consultas frecuentes de escrituras financieras; versión y fecha de actualización permiten medir frescura. Se evaluó leer siempre Core/detalle, lo que reduce duplicación pero eleva latencia y carga; DynamoDB nunca autoriza ni debita, y su adopción queda condicionada al patron de acceso real.
+\item \textbf{ECS Fargate, API Gateway, RDS Multi-AZ y servicios administrados.} Fargate reduce gestión de servidores; Multi-AZ y colas administradas reducen puntos únicos de falla zonales y carga operativa. Se evaluaron Lambda (menos operación, pero requiere validar duracion/concurrencia) y EKS (mayor control, más carga operacional); se elige ECS para mantener contenedores sin gestionar Kubernetes [21]. La resiliencia regional y sus RTO/RPO/costos siguen pendientes.
+\item \textbf{Auditoría asíncrona y almacenamiento inmutable.} Una cola dedicada separa auditoría de notificaciones y permite reintentos propios; roles separados y S3 Object Lock reducen la posibilidad de alterar registros. Se evaluó escribir auditoría en la misma base operativa, más simple pero con mayor riesgo de modificación y contención. Retención y controles legales deben definirse con el negocio.
 \end{enumerate}
 
 \chapter{Auditoría de autenticación y autorización}
 \section{OAuth 2.0, OIDC y MFA}
 Web y móvil usan flujo Authorization Code con PKCE S256; la SPA valida `state` al volver del proveedor y guarda solo access token en `sessionStorage`. Móvil usa navegador del sistema y guarda access token/expiración en SecureStore. Ningún cliente debe incluir un client secret. Los tokens Cognito se comprueban de nuevo en la API; las rutas API requieren autorización y auditoría requiere rol `Operations`.
 
-La plantilla de Cognito exige MFA, habilita TOTP y configuración WebAuthn con verificación del usuario, y usa Managed Login versión 2. La API acepta ACR 3 (passkey con verificación) o ACR 4 (password + TOTP). El claim ACR debe proceder del token validado y no del cuerpo HTTP. La plantilla y el callback del RP ID siguen sin probarse en una cuenta.
+La configuración objetivo de Cognito exige MFA y habilita TOTP y WebAuthn con verificación del usuario, usando Managed Login versión 2. Las operaciones sensibles (crear transferencias y sesiones de verificación facial) requieren `acr=urn:cognito:loa:4` y `amr=mfa` en el access token validado; ACR 3 por sí solo no se acepta como MFA porque puede corresponder a una passkey usada como único factor. Web y móvil solicitan ACR 4. La identidad local de desarrollo omite esta política solo en `Development` con la bandera explícita habilitada; no demuestra MFA real. El User Pool, el callback/RP ID y la emisión de claims siguen sin probarse en una cuenta AWS.
 
 \begin{summarybox}
 Corrección aplicada: el modo de autenticación local de la SPA solo puede activarse en build de desarrollo. El cliente móvil limpia access token ante `401` y captura errores de SecureStore durante el arranque. El refresh token/renovación aún no se implementa.
 \end{summarybox}
 
 \section{Riesgos y pruebas faltantes}
-La suite local usa una identidad de desarrollo y no genera JWT firmados. Antes de habilitar usuarios hacen falta pruebas con tokens inválidos o expirados, issuer/cliente ajeno, ID token en lugar de access token, scope/ACR ausente, dos clientes distintos, rol `Operations`, revocación, step-up y recuperación de MFA. La API debe confirmar que un `sub` solo accede a su cliente y cuentas asociadas.
+La suite local usa una identidad de desarrollo y no genera JWT firmados; por eso no prueba la validación de ACR/AMR ni la autorización MFA con Cognito. Antes de habilitar usuarios hacen falta pruebas con tokens inválidos o expirados, issuer/cliente ajeno, ID token en lugar de access token, scope/ACR/AMR ausentes o inconsistentes, step-up, rol `Operations`, revocación y recuperación de MFA. La API también debe confirmar que un `sub` solo accede a su cliente y cuentas asociadas.
 
 \chapter{Onboarding facial móvil}
 El flujo objetivo informa el uso de biometría, obtiene consentimiento antes de abrir cámara, crea una sesión temporal desde API autenticada, obtiene liveness por SDK nativo, compara la referencia facial con un documento confiable y deriva resultados ambiguos a revisión humana o una alternativa accesible.
 
-\begin{figure}[H]\centering\includegraphics[width=\textwidth]{bpmn-alta-facial.png}\caption{BPMN 2.0 -- alta facial con consentimiento, comparación y revisión. El modelo editable se entrega en `diagramas/alta-facial.bpmn`.}\end{figure}
+La verificación facial ocurre durante el alta y solo habilita la activación de la cuenta tras validar identidad y resolver excepciones. En accesos posteriores, el usuario se autentica mediante Authorization Code con PKCE; MFA con TOTP o passkey puede elevar la garantía de autenticación. La prueba de vida es una verificación de identidad del onboarding, no un segundo factor de inicio de sesión. La autorización de cada operación se decide en el backend según identidad, permisos, titularidad de cuenta y reglas de riesgo.
+
+\clearpage
+\begin{landscape}
+\thispagestyle{fancy}
+\begin{figure}[H]\centering\includegraphics[width=0.99\linewidth,height=0.82\textheight,keepaspectratio]{bpmn-alta-facial.png}\caption{Flujo de alta facial: consentimiento, ruta alternativa, verificación y revisión humana.}\end{figure}
+\end{landscape}
+\clearpage
 
 El código actual cubre el primer paso y el contrato de creación de sesión. El servidor devuelve HTTP 400 si no existe consentimiento y HTTP 503 mientras el servicio no esté configurado. La app no solicita cámara ni afirma identidad. Face Liveness verifica presencia, pero no identifica por sí sola a una persona; el cotejo requiere una imagen fuente confiable y umbrales evaluados. Deben minimizarse la retención y exposición de imagen/video, permitir ruta alternativa, explicar el tratamiento y revisar casos de alto impacto.
 
@@ -143,7 +201,12 @@ Para React Native con Expo se requiere seleccionar y revisar un puente nativo ma
 \chapter{Notificaciones del teléfono}
 El centro de avisos existente lee notificaciones del API. La pantalla móvil solicita permiso del sistema, muestra su estado y programa una notificación local para validar que Android/iOS entregue un aviso. Esta prueba no demuestra push remoto.
 
-\begin{figure}[H]\centering\includegraphics[width=\textwidth]{bpmn-notificaciones.png}\caption{BPMN 2.0 -- persistencia de evento, entrega multicanal y recuperación con backoff/DLQ.}\end{figure}
+\clearpage
+\begin{landscape}
+\thispagestyle{fancy}
+\begin{figure}[H]\centering\includegraphics[width=0.99\linewidth,height=0.82\textheight,keepaspectratio]{bpmn-notificaciones.png}\caption{Flujo de notificaciones: outbox, cola, entrega, reintentos acotados y DLQ.}\end{figure}
+\end{landscape}
+\clearpage
 
 Para la integración futura: pedir permiso con contexto; registrar token FCM/APNs autenticado y vinculado al usuario; nunca guardar credenciales AWS en la app; publicar desde rol del backend por SNS; procesar avisos in-app y correo como consumidores independientes; limpiar tokens inválidos; incluir reintentos acotados, DLQ, métricas y preferencias del usuario. Las pruebas push exigen development build, configuración FCM/APNs y entorno AWS; la prueba local ya está implementada, pero la auditoría física queda pendiente.
 
@@ -183,17 +246,24 @@ Para operar en Ecuador, el dise\~no debe someterse a revisi\'on jur\'idica y de 
 Como referencias de implementaci\'on, usar ISO/IEC 27001/27017/27018, NIST Cybersecurity Framework, controles OWASP para APIs y aplicaciones m\'oviles, y un proceso de respuesta a incidentes, continuidad y recuperaci\'on. El equipo legal/compliance debe determinar obligaciones regulatorias exactas, licencias, reportes al supervisor, KYC/AML, residencia y transferencia internacional de datos antes de dise\~nar el entorno de producci\'on.
 
 \section{Modelo de costos}
-La región `us-east-1` y la carga de baja demanda en `docs/aws-calculator-scenario.csv` son un escenario provisional, no confirmado por el usuario. Incluye 1.000 MAU, 10.000 solicitudes de API y 100 verificaciones faciales mensuales, además de cómputo, base de datos Multi-AZ, mensajería, almacenamiento, salida, logs, alertas e identidad. El modo DR secundario se estimará como escenario separado con RTO/RPO definidos.
+Se construyo una estimacion mensual de baja demanda para us-east-1, tomando como base el escenario provisional de docs/aws-calculator-scenario.csv y explicitando los tamanos que faltaban en docs/aws-estimate-assumptions.csv. El escenario de referencia suma aproximadamente USD 251.21 al mes antes de impuestos, soporte, trafico de salida a Internet, respaldos sobre la asignacion incluida, rotacion de secretos y cargos de servicios opcionales. Es una estimacion de trabajo, no una cotizacion ni un compromiso de precio de AWS.
 
-No se incorpora un total en dólares porque el usuario pidió completar los valores junto con AWS Pricing Calculator y todavía faltan clase/almacenamiento RDS, CPU/memoria Fargate, transferencia saliente, retención de logs, reglas WAF, endpoints/mensajes SNS y política biométrica. El estimado compartible y el gráfico final de costos se añaden después de esa sesión. AWS Calculator ofrece estimaciones, no cotizaciones.
+El modelo supone 1.000 usuarios activos al mes, 10.000 solicitudes HTTP API, 100 sesiones de Face Liveness, dos tareas Linux/x86 de Fargate (0.5 vCPU y 1 GB cada una), un ALB con 1 LCU promedio y RDS PostgreSQL db.t4g.small Multi-AZ con 20 GB gp3 por nodo. Para alta disponibilidad de salida privada se modelan dos NAT Gateways, 20 GB procesados y cuatro direcciones IPv4 publicas entre NAT y ALB. WAF supone una ACL y tres reglas estandar. El resto de volumenes, precios unitarios y exclusiones estan en el CSV de estimacion para poder revisarlos en AWS Pricing Calculator.
 
-\begin{figure}[H]\centering\includegraphics[width=0.92\textwidth]{modelo-costos.png}\caption{Partidas que deben introducirse en AWS Pricing Calculator; el gráfico no muestra precios ni subtotal.}\end{figure}
+La estimacion aplica los niveles incluidos asumidos para Cognito, SQS, SNS, CloudFront, CloudWatch y CloudTrail. El costo real puede cambiar si la cuenta no califica, si otra carga ya consume esas asignaciones o si cambia la configuracion. La base Multi-AZ de RDS y dos NAT Gateways reflejan disponibilidad; no deben eliminarse para reducir el costo sin aceptar expresamente la degradacion de resiliencia. Una alternativa con un NAT Gateway reduce el modelo a aproximadamente USD 214.71 al mes, pero elimina tolerancia a fallos de salida entre zonas.
+
+\begin{figure}[H]\centering\includegraphics[width=0.94\textwidth]{modelo-costos.png}\caption{Desglose mensual del escenario provisional de alta disponibilidad. Los importes en cero dependen de las asignaciones incluidas indicadas en los supuestos.}\end{figure}
+\begin{figure}[H]\centering\includegraphics[width=0.86\textwidth]{escenarios-costos.png}\caption{Sensibilidad del total frente a la topologia de NAT. El segundo escenario mantiene salida redundante por zona.}\end{figure}
+
+La partida dominante es la red privada con dos NAT Gateways, seguida de RDS Multi-AZ y el computo permanente. El costo de RDS usa una tarifa publica provisional de instancia y gp3 que se debe validar en Calculator; AWS factura Multi-AZ por computo y almacenamiento replicado. Solicitudes externas, transferencia, respaldos, alarmas y retencion pueden elevar el total. El escenario de recuperacion ante desastres en una segunda region queda fuera hasta definir RTO/RPO.
+
+Para convertirlo en estimacion aprobable, confirmar en conjunto region, datos de carga, clase y almacenamiento de RDS, dimensionamiento de tareas, nivel de cuenta/free tier, trafico de salida y retencion; luego guardar el enlace compartible de AWS Pricing Calculator. La calculadora proporciona una estimacion, no una cotizacion.
 
 \chapter{Plan de cierre}
 \begin{enumerate}
 \item Confirmar volúmenes, región y supuestos de costo; completar y guardar enlace compartible de AWS Pricing Calculator.
 \item Elegir integración facial nativa soportada y revisar privacidad, fallback, umbrales, retención y atención humana.
-\item Configurar un entorno aislado Cognito; probar OAuth PKCE, MFA TOTP/passkey, claims ACR y permisos API con tokens reales.
+\item Configurar un entorno aislado Cognito; probar OAuth PKCE, MFA TOTP/passkey, claims ACR/AMR y políticas API con tokens reales, incluidos rechazos cuando falte `amr=mfa` o ACR 4.
 \item Conectar notificaciones remotas con tokens móviles, SNS y segundo canal, y probar entrega/reintento/DLQ.
 \item Completar acceso multiusuario, adapter Core/detalle, conciliación/compensación interbancaria, almacenamiento durable de auditoría y pruebas de caos/DR.
 \item Validar CloudFormation/containers y escaneos CI; revisar el informe y luego preparar el commit/repo público con secretos y archivos locales excluidos.
@@ -212,10 +282,58 @@ No se incorpora un total en dólares porque el usuario pidió completar los valo
 \item Expo, notificaciones push y development builds: \url{https://docs.expo.dev/push-notifications/overview/}.
 \item BPMN.io / bpmn-js, modelo BPMN 2.0, import/export y SVG: \url{https://bpmn.io/toolkit/bpmn-js/walkthrough/} y \url{https://bpmn.io/toolkit/bpmn-js/walkthrough/exporting}.
 \item AWS Pricing Calculator: \url{https://calculator.aws/}. El estimador no es cotización.
+\item AWS, precios de computo Fargate, Application Load Balancer y red NAT/IPv4: \url{https://aws.amazon.com/fargate/pricing/}, \url{https://aws.amazon.com/elasticloadbalancing/pricing/}, \url{https://aws.amazon.com/vpc/pricing/}.
+\item AWS, precios y modelo de cobro de WAF, RDS PostgreSQL, DynamoDB y Cognito: \url{https://aws.amazon.com/waf/pricing/}, \url{https://aws.amazon.com/rds/postgresql/pricing/}, \url{https://aws.amazon.com/dynamodb/pricing/}, \url{https://aws.amazon.com/cognito/pricing/}.
+\item AWS, precios de API Gateway, Rekognition, SQS, SNS, SES, S3, CloudFront, CloudWatch y Secrets Manager; enlaces detallados en docs/costos-aws.md.
 \item Ecuador, Ley Org\'anica de Protecci\'on de Datos Personales, Registro Oficial, Quinto Suplemento No. 459: \url{https://www.registroficial.gob.ec/quinto-suplemento-al-registro-oficial-no-459/}.
 \item Ecuador, Reglamento General de la LOPDP, Registro Oficial, Tercer Suplemento No. 435: \url{https://www.registroficial.gob.ec/tercer-suplemento-al-registro-oficial-no-435/}.
 \item Superintendencia de Bancos del Ecuador, Codificaci\'on de las Normas de la SB, seguridad de la informaci\'on y ciberseguridad: \url{https://www.superbancos.gob.ec/bancos/descargas/40954/}.
 \item PCI Security Standards Council, Biblioteca de documentos PCI DSS v4.0.1: \url{https://www.pcisecuritystandards.org/es/document_library/}.
+\item C4 Model, contexto, contenedores, componentes, despliegue y checklist de revisión: \url{https://c4model.com/diagrams/system-context}, \url{https://c4model.com/diagrams/container}, \url{https://c4model.com/diagrams/component}, \url{https://c4model.com/diagrams/deployment}, \url{https://c4model.com/diagrams/checklist}.
+\item IETF, RFC 9700, Best Current Practice for OAuth 2.0 Security: \url{https://www.rfc-editor.org/rfc/rfc9700.html}.
+\item IETF, RFC 10017, OAuth 2.0 for Browser-Based Applications: \url{https://www.rfc-editor.org/rfc/rfc10017.html}.
+\item AWS Prescriptive Guidance, Transactional outbox pattern: \url{https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html}.
+\item AWS Well-Architected Framework, pilares y guias de diseno: \url{https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html}.
+\item AWS, integracion privada de REST API Gateway mediante VPC Link V2 con ALB: \url{https://docs.aws.amazon.com/apigateway/latest/developerguide/private-integration.html}.
 \end{enumerate}
+
+\appendix
+\chapter{Matriz de trazabilidad con los criterios de evaluaci\'on}
+\label{chap:trazabilidad}
+La matriz relaciona cada criterio del enunciado con evidencia concreta y con el nivel de madurez que tiene hoy. ``Implementado'' se refiere al MVP local; ``dise\~no'' identifica una decisi\'on documentada que todav\'ia no se ha desplegado o validado con proveedores reales.
+
+\begin{landscape}
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.12}
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.21\textwidth}>{\raggedright\arraybackslash}p{0.56\textwidth}>{\raggedright\arraybackslash}p{0.19\textwidth}@{}}
+\toprule
+\textbf{Criterio} & \textbf{Evidencia en la soluci\'on} & \textbf{Madurez} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Criterio} & \textbf{Evidencia en la soluci\'on} & \textbf{Madurez} \\
+\midrule
+\endhead
+Requisitos y justificaci\'on & El alcance, las decisiones y la validaci\'on separan funciones del MVP, objetivos de arquitectura y brechas pendientes. & Parcial; brechas expl\'icitas \\
+Diagramas C4 & Se incluyen contexto, contenedores, componentes, despliegue y recuperaci\'on, con l\'imites y relaciones descritos. & Documentado \\
+Responsabilidades y desacoplamiento & La API separa responsabilidades; el procesamiento as\'incrono y los adaptadores desacoplan canales, Core y proveedores. & Mixto; parte es dise\~no \\
+Patrones de arquitectura & Hay idempotencia en transferencias propias; outbox se documenta para eventos fiables y CQRS/proyecciones para lecturas. & Idempotencia implementada; dem\'as propuestos \\
+Integraci\'on externa & Se definen contratos para Core, detalle, transferencias y proveedores de identidad/notificaciones; las integraciones bancarias reales siguen pendientes. & Pendiente de proveedores \\
+Front-end y m\'ovil & La SPA compila; la app Expo pas\'o comprobaciones est\'aticas y export Android en entorno temporal. Faltan E2E y validaci\'on en dispositivos. & Parcial; falta dispositivo \\
+Acceso a datos & El MVP usa SQLite local. El objetivo propone PostgreSQL/RDS como fuente de verdad y DynamoDB solo para proyecciones de consulta. & Local implementado; AWS propuesto \\
+Nube (AWS o Azure) & La propuesta describe servicios, redes, despliegue, seguridad y continuidad en AWS; no hay recursos desplegados. & Dise\~no; sin despliegue \\
+Costos & El escenario de dos zonas estima USD 251.21/mes; la alternativa con un NAT estima USD 214.71/mes. Ambos valores son provisionales y deben validarse juntos en AWS Pricing Calculator. & Provisional; sin validar \\
+Autenticaci\'on & Se documenta OAuth 2.0/OIDC con PKCE y MFA. La identidad local funciona; Cognito est\'a preparado parcialmente y faltan pruebas con tokens reales. & Parcial; falta IdP real \\
+Onboarding & Se documentan consentimiento y sesi\'on facial; la API devuelve 503 hasta integrar el proveedor. No se captura ni verifica biometr\'ia real. & Flujo y contrato; proveedor pendiente \\
+Auditor\'ia & Existe la ruta protegida por rol; el almacenamiento inmutable en S3 es dise\~no. La captura y consulta con un usuario autorizado no est\'an verificadas. & Parcial; evidencia pendiente \\
+Regulaci\'on y seguridad & Se identifican LOPDP, normativa de la Superintendencia de Bancos y controles OWASP; PCI DSS se condiciona a que aplique al alcance. & Referenciado; requiere validaci\'on formal \\
+Alta disponibilidad y tolerancia a fallos & Se propone despliegue Multi-AZ, respaldos y recuperaci\'on; no se han ejecutado pruebas de failover/DR y RTO/RPO siguen por definir. & Dise\~no; sin pruebas \\
+Monitoreo & Se plantea observabilidad con m\'etricas, logs y alarmas en AWS; el MVP local conserva identificadores de correlaci\'on, sin paneles ni alarmas desplegados. & Local b\'asico; AWS propuesto \\
+\bottomrule
+\end{longtable}
+\endgroup
+\end{landscape}
+
 
 \end{document}

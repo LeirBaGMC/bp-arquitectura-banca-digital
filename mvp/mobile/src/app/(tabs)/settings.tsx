@@ -15,8 +15,8 @@ export default function SettingsScreen() {
     <Card title="Autenticación multifactor">
       <Text>{localMode
         ? 'El acceso local de desarrollo no usa MFA.'
-        : 'Cognito puede validar una passkey con verificación del dispositivo o solicitar TOTP.'}</Text>
-      <Message>El teléfono puede pedir huella, rostro o PIN para usar la passkey; esos datos no salen del autenticador. KYC verifica tu identidad durante el alta.</Message>
+        : 'Las operaciones sensibles requieren que Cognito confirme MFA. Completa el segundo factor que solicite el proveedor.'}</Text>
+      <Message>La huella, el rostro y las passkeys todavía no están integrados en la app. La API valida MFA cuando Cognito está configurado; el reconocimiento facial del alta es un proceso de identidad separado.</Message>
     </Card>
     <Card title="Verificación de identidad">
       <Text>Continúa el alta de tu cuenta y consulta los requisitos de verificación.</Text>

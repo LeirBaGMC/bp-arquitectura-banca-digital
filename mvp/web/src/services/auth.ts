@@ -62,7 +62,7 @@ export async function beginLogin() {
     client_id: clientId,
     redirect_uri: redirectUri,
     scope: `openid email ${requiredScope}`,
-    acr_values: 'urn:cognito:loa:3',
+    acr_values: 'urn:cognito:loa:4',
     state,
     code_challenge: await createChallenge(verifier),
     code_challenge_method: 'S256',

@@ -57,3 +57,13 @@ La API debe validar el access token y los claims configurados. No uses el modo l
 ## Operaciones
 
 Las transferencias interbancarias quedan pendientes hasta recibir confirmación de un proveedor real. El flujo móvil no simula la liquidación. La validación de identidad de alta digital requiere la integración futura con un proveedor KYC; la biometría local del teléfono no constituye verificación de identidad bancaria.
+
+## Notificaciones móviles
+
+La pantalla permite comprobar permisos y mostrar una notificación local del sistema. Eso no registra el dispositivo ni envía avisos remotos. En Android, Expo Go no admite notificaciones push remotas desde Expo SDK 53; para validarlas se necesita un development build con FCM/APNs configurado. La app no debe contener credenciales de AWS: la API debe recibir el token nativo autenticado, registrarlo con Amazon SNS y conservar la asociación con el usuario. También faltan baja del dispositivo al cerrar sesión, renovación del token y manejo de endpoints inválidos.
+
+## Alta facial
+
+El formulario recoge consentimiento y llama a la API, que responde `503` hasta configurar un proveedor; no captura ni transmite imágenes. Amazon Rekognition Face Liveness requiere que el backend cree la sesión y consulte el resultado, y que el cliente integre su detector nativo para transmitir el video. La integración oficial de Amplify ofrece detectores para React web, Swift e iOS y Android nativo; no existe un detector React Native oficial. Para mantener Expo se necesita seleccionar y auditar un módulo nativo compatible, cambiar de Expo Go a development build, y probar permisos de cámara, región AWS, umbrales, tratamiento/retención de imágenes y una alternativa accesible. No se debe entregar credencial AWS de larga duración al móvil.
+
+Referencias: [Expo Notifications SDK 58](https://docs.expo.dev/versions/v58.0.0/sdk/notifications/), [AWS SNS para endpoints móviles](https://docs.aws.amazon.com/sns/latest/dg/mobile-platform-endpoint.html), [Amazon Rekognition Face Liveness](https://docs.aws.amazon.com/rekognition/latest/dg/face-liveness.html), [API de Face Liveness](https://docs.aws.amazon.com/rekognition/latest/dg/face-liveness-programming-api.html).

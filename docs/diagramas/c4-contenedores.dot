@@ -1,0 +1,58 @@
+digraph C4Containers {
+  graph [rankdir=TB, newrank=true, bgcolor="white", pad="0.28", nodesep="0.32", ranksep="0.48", splines=polyline, fontname="Segoe UI", fontsize=18, labelloc="t", label="C4 | Contenedores de BP Digital\nCanales, API, datos y procesamiento asíncrono"];
+  node [shape=box, style="rounded,filled", fontname="Segoe UI", fontsize=10, margin="0.18,0.12", color="#58758B", fontcolor="#153A53", penwidth=1.35];
+  edge [fontname="Segoe UI", fontsize=8.5, color="#688196", fontcolor="#486276", penwidth=1.1, arrowsize=0.65];
+
+  user [label="Cliente bancario", fillcolor="#F1F5F8"];
+  web [label="SPA web\nReact · TypeScript", fillcolor="#F1F5F8"];
+  mobile [label="App móvil\nExpo · React Native", fillcolor="#F1F5F8"];
+  cdn [label="CloudFront + WAF\nEntrega y protección web", fillcolor="#FFF6E8", color="#C08329"];
+  gateway [label="API Gateway REST\nCuotas · throttling · JWT", fillcolor="#FFF6E8", color="#C08329"];
+
+  subgraph cluster_system {
+    label="BP Digital · arquitectura objetivo en AWS (no desplegada)";
+    style="rounded,dashed"; color="#1670B8"; fontname="Segoe UI"; fontsize=11; fontcolor="#1670B8"; penwidth=1.5;
+    api [label="API ASP.NET Core\nECS Fargate · monolito modular", fillcolor="#E6F1F8", color="#1670B8", penwidth=2];
+    cognito [label="Amazon Cognito\nOIDC · MFA · PKCE", fillcolor="#F1F5F8"];
+    rds [label="RDS PostgreSQL\nFuente transaccional · Multi-AZ", fillcolor="#F1F5F8"];
+    ddb [label="DynamoDB\nProyección de lectura · TTL/versión", fillcolor="#F1F5F8"];
+    events [label="EventBridge + SQS\nTres colas independientes · DLQ", fillcolor="#FFF6E8", color="#C08329"];
+    workers [label="Consumidores separados\nTransferencias · proyección · auditoría · avisos", fillcolor="#E6F1F8"];
+    auditstore [label="S3 Object Lock\nRetención protegida", fillcolor="#F1F5F8"];
+  }
+
+  coredetail [label="Core + sistema de detalle\nDos integraciones independientes", fillcolor="#F7F9FB"];
+  payments [label="Red de pagos\nTransferencias interbancarias", fillcolor="#F7F9FB"];
+  face [label="Verificación facial\nLiveness · cotejo documental", fillcolor="#F7F9FB"];
+  push [label="Push\nFCM / APNs", fillcolor="#F7F9FB"];
+  email [label="Correo\nAmazon SES", fillcolor="#F7F9FB"];
+
+  {rank=same; web; mobile}
+  {rank=same; cdn; gateway}
+  {rank=same; cognito; rds; ddb; events}
+  {rank=same; coredetail; face; payments; workers}
+  {rank=same; push; email; auditstore}
+
+  user -> web [label="usa"];
+  user -> mobile [label="usa"];
+  web -> cdn [label="HTTPS"];
+  cdn -> gateway [label="HTTPS"];
+  mobile -> gateway [label="HTTPS / JSON"];
+  gateway -> api [label="VPC Link · TLS"];
+  api -> cognito [label="JWKS · valida JWT"];
+  api -> rds [label="SQL/TLS · transacciones"];
+  api -> ddb [label="lectura Cache-Aside"];
+  api -> events [label="outbox · publica eventos"];
+  api -> coredetail [label="datos básicos y actividad"];
+  api -> payments [label="instrucción autenticada"];
+  api -> face [label="sesión del alta"];
+  events -> workers [label="reintentos · DLQ"];
+  workers -> ddb [label="actualiza proyección versionada"];
+  workers -> payments [label="procesa transferencia"];
+  workers -> push [label="aviso independiente"];
+  workers -> email [label="aviso independiente"];
+  workers -> auditstore [label="auditoría protegida"];
+
+  note [shape=note, label="La proyección DynamoDB es eventual; la API recurre a la fuente autoritativa si falta o vence.\nEl MVP usa SQLite y un worker local; el despliegue cloud aún no existe.", fontsize=8.5, fillcolor="#FFF7E8", color="#C08329"];
+  {rank=sink; note}
+}

@@ -1,18 +1,19 @@
 flowchart LR
     PERSONA[Cliente bancario]
-    BP[Canales BP: SPA + app móvil]
-    CORE[Core: datos básicos, productos, movimientos]
-    DETALLE[Sistema de información detallada]
-    IDP[Proveedor de identidad OAuth 2.0 / OIDC]
-    FACIAL[Proveedor de verificación facial]
-    PAGO[Red de pagos interbancarios]
-    EMAIL[Proveedor de correo]
-    OTRO[Push o SMS]
-    PERSONA -->|consulta, inicia sesión, transfiere| BP
-    BP --> IDP
-    BP --> FACIAL
-    BP --> CORE
-    BP --> DETALLE
-    BP --> PAGO
-    BP --> EMAIL
-    BP --> OTRO
+    SPA[SPA web]
+    APP[Aplicacion movil]
+    API[BP Digital: API bancaria]
+    IDP[Proveedor identidad: OAuth2 OIDC MFA]
+    CORE[Core y sistema de detalle]
+    PAY[Red de pagos]
+    NOTICE[Correo y push]
+    BIO[Proveedor liveness facial]
+    PERSONA -->|consulta cuentas movimientos transferencias| SPA
+    PERSONA -->|consulta cuentas movimientos transferencias| APP
+    SPA -->|HTTPS JSON| API
+    APP -->|HTTPS JSON| API
+    API -->|OIDC login MFA| IDP
+    API -->|adaptador autenticado futuro| CORE
+    API -->|adaptador autenticado futuro| PAY
+    API -->|eventos futuros| NOTICE
+    API -->|sesion verificada futura| BIO

@@ -1,15 +1,5 @@
-import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
-
 export async function requestDeviceNotifications() {
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('account-activity', {
-      name: 'Actividad de cuenta',
-      importance: Notifications.AndroidImportance.DEFAULT,
-      vibrationPattern: [0, 200],
-      lightColor: '#1670b8',
-    });
-  }
+  const Notifications = await import('expo-notifications');
 
   const current = await Notifications.getPermissionsAsync();
   const permission = current.granted ? current : await Notifications.requestPermissionsAsync();
@@ -17,6 +7,8 @@ export async function requestDeviceNotifications() {
 }
 
 export async function scheduleDeviceNotificationCheck() {
+  const Notifications = await import('expo-notifications');
+
   await Notifications.scheduleNotificationAsync({
     content: {
       title: 'Avisos de cuenta',

@@ -25,7 +25,7 @@ export default function LoginScreen() {
     responseType: AuthSession.ResponseType.Code,
     usePKCE: true,
     scopes: ['openid', 'email', requiredScope],
-  extraParams: { acr_values: 'urn:cognito:loa:3' },
+  extraParams: { acr_values: 'urn:cognito:loa:4' },
   }, discovery);
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export default function LoginScreen() {
       {domain && clientId ? <PrimaryButton title="Continuar con BP" onPress={() => { setError(null); void promptAsync(); }} disabled={!request} /> : <Message>Configura el dominio y el cliente de Cognito en el archivo .env de esta app.</Message>}
       {localEnabled ? <Pressable style={styles.localButton} onPress={() => { activateLocalMode(); router.replace('/(tabs)'); }}><Text style={styles.localText}>Entrar en desarrollo local</Text></Pressable> : null}
     </Card>
-    <Message>Cognito verifica la passkey. El teléfono puede pedir huella, rostro o PIN; esos datos no salen del autenticador. La verificación KYC del alta es un proceso separado.</Message>
+    <Message>La autenticación con huella, rostro o passkey todavía no está habilitada en esta app. La verificación facial del alta es un control de identidad separado del segundo factor MFA.</Message>
   </Page>;
 }
 

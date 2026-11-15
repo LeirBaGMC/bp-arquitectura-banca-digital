@@ -1,0 +1,38 @@
+digraph C4Context {
+  graph [rankdir=LR, newrank=true, bgcolor="white", pad="0.30", nodesep="0.38", ranksep="0.78", splines=polyline, fontname="Segoe UI", fontsize=20, labelloc="t", label="C4 | Contexto de BP Digital\nUna persona, el sistema en alcance y sus dependencias directas"];
+  node [shape=box, style="rounded,filled", fontname="Segoe UI", fontsize=11, margin="0.22,0.15", color="#58758B", fontcolor="#153A53", penwidth=1.5];
+  edge [fontname="Segoe UI", fontsize=9.5, color="#688196", fontcolor="#486276", penwidth=1.25, arrowsize=0.72];
+
+  user [label="Cliente bancario\nPersona usuaria", fillcolor="#F1F5F8"];
+  web [label="Canal web\nSPA React", fillcolor="#F1F5F8"];
+  mobile [label="Canal móvil\nExpo / React Native", fillcolor="#F1F5F8"];
+  bp [label="BP Digital\nSistema de banca digital\nCuentas · movimientos · pagos · transferencias", fillcolor="#E6F1F8", color="#1670B8", penwidth=2];
+
+  idp [label="Proveedor de identidad\nOAuth 2.0 / OIDC · MFA", fillcolor="#F7F9FB"];
+  core [label="Core bancario\nDatos básicos · cuentas · productos", fillcolor="#F7F9FB"];
+  detail [label="Sistema de detalle\nMovimientos · perfil ampliado", fillcolor="#F7F9FB"];
+  pay [label="Red de pagos\nTransferencias interbancarias", fillcolor="#F7F9FB"];
+  face [label="Verificación de identidad\nPrueba de vida · cotejo documental", fillcolor="#F7F9FB"];
+  push [label="Proveedor de push\nFCM / APNs", fillcolor="#F7F9FB"];
+  email [label="Proveedor de correo\nEntrega de avisos", fillcolor="#F7F9FB"];
+
+  {rank=same; web; mobile}
+  {rank=same; idp; core; detail; pay; face; push; email}
+  user -> web [label="usa"];
+  user -> mobile [label="usa"];
+  web -> bp [label="consulta y solicita operaciones"];
+  mobile -> bp [label="consulta y solicita operaciones"];
+  bp -> idp [label="autentica"];
+  bp -> core [label="consulta datos básicos"];
+  bp -> detail [label="consulta movimientos y perfil"];
+  bp -> pay [label="envía transferencias"];
+  bp -> face [label="verifica identidad en el alta"];
+  bp -> push [label="envía avisos push"];
+  bp -> email [label="envía avisos por correo"];
+
+  core -> detail [style=invis, weight=10];
+  detail -> pay [style=invis, weight=10];
+  pay -> face [style=invis, weight=10];
+  face -> push [style=invis, weight=10];
+  push -> email [style=invis, weight=10];
+}

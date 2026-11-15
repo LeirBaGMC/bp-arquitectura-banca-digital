@@ -46,7 +46,7 @@ Las páginas ensamblan organismos y el template; los organismos consumen servici
 
 ## Requisitos
 
-- .NET SDK 8
+- .NET SDK 10 LTS
 - Node.js 20.19 o posterior y npm
 - Docker Engine con el complemento Docker Compose
 

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Authorization;
 
 [ApiController]
 [Route("api/transfers")]
@@ -16,6 +17,7 @@ public sealed class TransfersController(DemoBankingService banking) : Controller
     }
 
     [HttpPost]
+    [Authorize(Policy = "StrongMfa")]
     [RequestSizeLimit(16_384)]
     [EnableRateLimiting("transfers")]
     public async Task<IActionResult> CreateTransfer([FromBody] TransferRequest request)

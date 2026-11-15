@@ -84,18 +84,19 @@ else
                 var principal = context.Principal;
                 var tokenClientId = principal?.FindFirst("client_id")?.Value;
                 var tokenUse = principal?.FindFirst("token_use")?.Value;
-                var authenticationLevel = principal?.FindFirst("acr")?.Value;
                 var scopes = principal?.FindFirst("scope")?.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [];
                 if (tokenClientId is null || !clientIds.Contains(tokenClientId) || tokenUse != "access" ||
-                    string.IsNullOrWhiteSpace(principal?.FindFirst("sub")?.Value) || !scopes.Contains(requiredScope, StringComparer.Ordinal) ||
-                    authenticationLevel is not ("urn:cognito:loa:3" or "urn:cognito:loa:4"))
+                    string.IsNullOrWhiteSpace(principal?.FindFirst("sub")?.Value) || !scopes.Contains(requiredScope, StringComparer.Ordinal))
                     context.Fail("The access token is missing required banking claims.");
                 return Task.CompletedTask;
             }
         };
     });
 }
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options => options.AddPolicy("StrongMfa", policy =>
+    policy.RequireAuthenticatedUser().RequireAssertion(context =>
+        (localIdentityEnabled && context.User.Identity?.AuthenticationType == "Development") ||
+        CognitoMfaClaims.HasTotpMfa(context.User))));
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;

@@ -17,3 +17,10 @@
 *.user
 *.suo
 *.log
+/output/*.zip
+/output/pdf/*.aux
+/output/pdf/*.out
+/output/pdf/*.toc
+/output/pdf/*.fls
+/output/pdf/*.fdb_latexmk
+/output/pdf/*.synctex.gz
