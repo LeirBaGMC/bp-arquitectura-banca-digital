@@ -2,6 +2,10 @@
 
 Propuesta académica de arquitectura y MVP local para una plataforma de banca por internet. El repositorio contiene una API, una SPA web y una aplicación móvil de demostración. No procesa fondos reales ni representa una instalación lista para producción.
 
+## Informe final
+
+El informe de arquitectura y la respuesta al ejercicio están disponibles en [reporte-final.pdf](./reporte-final.pdf).
+
 ## Estructura
 
 - backend/: API ASP.NET Core sobre .NET 10 con persistencia SQLite local.
